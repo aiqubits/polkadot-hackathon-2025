@@ -1,21 +1,17 @@
 use axum::{
     body::Body,
-    extract::State,
     http::{Request, StatusCode},
-    middleware::Next,
     Router,
 };
 use pickers_server::{
     config::AppState,
     database::{create_pool, init_database},
     handlers::create_routes,
-    utils::AppError,
 };
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tower::ServiceExt;
-use uuid::Uuid;
 
 async fn create_test_app() -> Router {
     let pool = create_pool().await.expect("Failed to create test database pool");
@@ -24,8 +20,19 @@ async fn create_test_app() -> Router {
     let state = AppState {
         db: pool,
         jwt_secret: "test_secret_key_for_testing_purposes_only".to_string(),
+        password_salt: "test_salt_for_testing_purposes_only".to_string(),
+        password_master_key: "openpickopenpickopenpickopenpick".to_string(),
+        password_nonce: "openpickopen".to_string(),
+        pending_registration_cleanup_minutes: 10,
         verification_codes: Arc::new(Mutex::new(HashMap::new())),
         download_tokens: Arc::new(Mutex::new(HashMap::new())),
+        pending_registrations: Arc::new(Mutex::new(HashMap::new())),
+        blockchain_rpc_url: "https://evmtestnet.confluxrpc.com".to_string(),
+        blockchain_token_usdt_url: "https://www.okx.com/api/v5/market/ticker?instId=USDC-USDT".to_string(),
+        blockchain_authorized_contract_address: "0x2ed3dddae5b2f321af0806181fbfa6d049be47d8".to_string(),
+        blockchain_retry_times: 5,
+        blockchain_retry_interval_seconds: 10,
+        payment_rate: 5,
     };
 
     create_routes().with_state(state)
@@ -47,7 +54,9 @@ async fn test_user_registration_flow() {
             json!({
                 "email": test_email,
                 "user_name": "Test User",
-                "user_type": "Gen"
+                "user_password": "test123456",
+                "user_password": "test123456",
+                "user_type": "gen"
             })
             .to_string(),
         ))
@@ -61,7 +70,8 @@ async fn test_user_registration_flow() {
 async fn test_user_registration_duplicate_email() {
     let app = create_test_app().await;
     
-    let test_email = "duplicate@example.com";
+    let timestamp = chrono::Utc::now().timestamp();
+    let test_email = format!("duplicate{}@example.com", timestamp);
     
     // 第一次注册
     let register_request1 = Request::builder()
@@ -72,7 +82,8 @@ async fn test_user_registration_duplicate_email() {
             json!({
                 "email": test_email,
                 "user_name": "Test User 1",
-                "user_type": "Gen"
+        "user_password": "test123456",
+                "user_type": "gen"
             })
             .to_string(),
         ))
@@ -90,7 +101,7 @@ async fn test_user_registration_duplicate_email() {
             json!({
                 "email": test_email,
                 "user_name": "Test User 2",
-                "user_type": "Gen"
+                "user_type": "gen"
             })
             .to_string(),
         ))
@@ -115,6 +126,7 @@ async fn test_user_registration_invalid_user_type() {
             json!({
                 "email": test_email,
                 "user_name": "Test User",
+                "user_password": "test123456",
                 "user_type": "InvalidType"
             })
             .to_string(),
@@ -137,7 +149,8 @@ async fn test_user_registration_invalid_email() {
             json!({
                 "email": "invalid-email",
                 "user_name": "Test User",
-                "user_type": "Gen"
+                "user_password": "test123456",
+                "user_type": "gen"
             })
             .to_string(),
         ))

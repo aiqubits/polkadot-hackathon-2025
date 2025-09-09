@@ -1,24 +1,149 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use crate::database::DbPool;
-use crate::models::{VerificationCode, DownloadToken};
+use crate::models::{VerificationCode, DownloadToken, UserType};
+
+// 配置文件结构
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Config {
+    pub jwt: JwtConfig,
+    pub password: PasswordConfig,
+    pub pending_registration: PendingRegistrationConfig,
+    pub blockchain: BlockchainConfig,
+    pub payment: PaymentConfig,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct JwtConfig {
+    pub secret: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PasswordConfig {
+    pub salt: String,
+    pub master_key: String,
+    pub nonce: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PendingRegistrationConfig {
+    pub cleanup_minutes: i64,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct BlockchainConfig {
+    pub rpc_url: String,
+    pub token_usdt_url: String,
+    pub authorized_contract_address: String,
+    pub retry_times: i8,
+    pub retry_interval_seconds : i8,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PaymentConfig {
+    pub rate: i8,
+}
+
+impl Config {
+    pub fn from_file() -> Result<Self, config::ConfigError> {
+        let mut builder = config::Config::builder();
+
+        // 检查配置文件是否存在
+        let config_path = "config.toml";
+        if std::path::Path::new(config_path).exists() {
+            builder = builder.add_source(config::File::with_name(config_path));
+        } else {
+            eprintln!("Warning: config.toml file not found");
+        }
+
+        // 添加环境变量源
+        builder = builder
+            .add_source(config::Environment::with_prefix("PICKER"));
+
+        let config = builder.build()?.try_deserialize();
+        if let Ok(ref cfg) = config {
+            eprintln!("Loaded config: {:?}", cfg);
+        }
+        config
+    }
+}
+
+// 临时注册信息（等待邮箱验证）
+#[derive(Debug, Clone)]
+pub struct PendingRegistration {
+    pub email: String,
+    pub user_name: String,
+    pub user_password: String,
+    pub user_type: UserType,
+    pub created_at: DateTime<Utc>,
+}
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: DbPool,
     pub jwt_secret: String,
+    pub password_salt: String,
+    pub password_master_key: String,
+    pub password_nonce: String,
+    pub pending_registration_cleanup_minutes: i64,
+    pub blockchain_rpc_url: String,
+    pub blockchain_token_usdt_url: String,
+    pub blockchain_authorized_contract_address: String,
+    pub blockchain_retry_times: i8,
+    pub blockchain_retry_interval_seconds: i8,
+    pub payment_rate: i8,
     pub verification_codes: Arc<Mutex<HashMap<String, VerificationCode>>>,
     pub download_tokens: Arc<Mutex<HashMap<String, DownloadToken>>>,
+    pub pending_registrations: Arc<Mutex<HashMap<String, PendingRegistration>>>,
 }
 
 impl AppState {
     pub fn new(db: DbPool) -> Self {
+        // 尝试从配置文件读取配置，如果失败则使用默认值
+        let config = Config::from_file().unwrap_or_else(|_| {
+            eprintln!("Warning: Failed to load config file, using default values");
+            Config {
+                jwt: JwtConfig {
+                    secret: "your-secret-key".to_string(),
+                },
+                password: PasswordConfig {
+                    salt: "openpick".to_string(),
+                    master_key: "openpickopenpickopenpickopenpick".to_string(),
+                    nonce: "openpickopen".to_string(),
+                },
+                pending_registration: PendingRegistrationConfig {
+                    cleanup_minutes: 10,
+                },
+                blockchain: BlockchainConfig {
+                    rpc_url: "https://eth-mainnet.g.alchemy.com/v2/your-api-key".to_string(),
+                    token_usdt_url: "https://www.okx.com/api/v5/market/ticker?instId=USDC-USDT".to_string(),
+                    authorized_contract_address: "0x2ed3dddae5b2f321af0806181fbfa6d049be47d8".to_string(),
+                    retry_times: 5,
+                    retry_interval_seconds: 10,
+                },
+                payment: PaymentConfig {
+                    rate: 5,
+                },
+            }
+        });
+
         Self {
             db,
-            jwt_secret: "your-secret-key".to_string(), // 在生产环境中应该从环境变量读取
+            jwt_secret: config.jwt.secret,
+            password_salt: config.password.salt,
+            password_master_key: config.password.master_key,
+            password_nonce: config.password.nonce,
+            pending_registration_cleanup_minutes: config.pending_registration.cleanup_minutes,
+            blockchain_rpc_url: config.blockchain.rpc_url,
+            blockchain_token_usdt_url: config.blockchain.token_usdt_url,
+            blockchain_authorized_contract_address: config.blockchain.authorized_contract_address,
+            blockchain_retry_times: config.blockchain.retry_times,
+            blockchain_retry_interval_seconds: config.blockchain.retry_interval_seconds,
+            payment_rate: config.payment.rate,
             verification_codes: Arc::new(Mutex::new(HashMap::new())),
             download_tokens: Arc::new(Mutex::new(HashMap::new())),
+            pending_registrations: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -34,6 +159,16 @@ impl AppState {
         let mut tokens = self.download_tokens.lock().unwrap();
         let now = Utc::now();
         tokens.retain(|_, token| token.expires_at > now);
+    }
+
+    // 清理过期的待注册信息
+    pub fn cleanup_expired_pending_registrations(&self) {
+        let mut pending = self.pending_registrations.lock().unwrap();
+        let now = Utc::now();
+        // 使用配置文件中的清理时间
+        pending.retain(|_, registration| {
+            now.signed_duration_since(registration.created_at).num_minutes() < self.pending_registration_cleanup_minutes
+        });
     }
 }
 
@@ -64,7 +199,7 @@ impl Claims {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_app_state;
+    use crate::utils_tests::create_test_app_state;
     use crate::models::{VerificationCode, DownloadToken};
     use chrono::{Duration, Utc};
     use serial_test::serial;
@@ -75,7 +210,7 @@ mod tests {
     async fn test_app_state_new() {
         let state = create_test_app_state().await;
         
-        assert_eq!(state.jwt_secret, "test_secret_key_for_testing_purposes_only_do_not_use_in_production");
+        assert_eq!(state.jwt_secret, "your-secret-key");
         assert_eq!(state.verification_codes.lock().unwrap().len(), 0);
         assert_eq!(state.download_tokens.lock().unwrap().len(), 0);
     }
@@ -357,5 +492,137 @@ mod tests {
         handle2.await.unwrap();
         
         assert_eq!(state.download_tokens.lock().unwrap().len(), 20);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_cleanup_expired_pending_registrations() {
+        let state = create_test_app_state().await;
+        let now = Utc::now();
+        
+        // 添加有效的待注册信息
+        let valid_registration = PendingRegistration {
+            email: "valid@example.com".to_string(),
+            user_name: "Valid User".to_string(),
+            user_password: "password123".to_string(),
+            user_type: crate::models::UserType::Gen,
+            created_at: now - Duration::minutes(5), // 5分钟前创建
+        };
+        
+        // 添加过期的待注册信息
+        let expired_registration = PendingRegistration {
+            email: "expired@example.com".to_string(),
+            user_name: "Expired User".to_string(),
+            user_password: "password456".to_string(),
+            user_type: crate::models::UserType::Dev,
+            created_at: now - Duration::minutes(35), // 35分钟前创建（超过30分钟）
+        };
+        
+        state.pending_registrations.lock().unwrap().insert("valid".to_string(), valid_registration);
+        state.pending_registrations.lock().unwrap().insert("expired".to_string(), expired_registration);
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 2);
+        
+        // 清理过期的待注册信息
+        state.cleanup_expired_pending_registrations();
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 1);
+        assert!(state.pending_registrations.lock().unwrap().contains_key("valid"));
+        assert!(!state.pending_registrations.lock().unwrap().contains_key("expired"));
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_cleanup_expired_pending_registrations_empty() {
+        let state = create_test_app_state().await;
+        
+        // 测试空的待注册信息集合
+        state.cleanup_expired_pending_registrations();
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_cleanup_expired_pending_registrations_all_valid() {
+        let state = create_test_app_state().await;
+        let now = Utc::now();
+        
+        // 添加多个有效的待注册信息
+        for i in 1..=3 {
+            let registration = PendingRegistration {
+                email: format!("user{}@example.com", i),
+                user_name: format!("User {}", i),
+                user_password: format!("password{}", i),
+                user_type: crate::models::UserType::Gen,
+                created_at: now - Duration::minutes(9), // 9分钟前创建
+            };
+            state.pending_registrations.lock().unwrap().insert(format!("reg{}", i), registration);
+        }
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 3);
+        
+        // 清理过期的待注册信息（应该没有过期的）
+        state.cleanup_expired_pending_registrations();
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 3);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_cleanup_expired_pending_registrations_all_expired() {
+        let state = create_test_app_state().await;
+        let now = Utc::now();
+        
+        // 添加多个过期的待注册信息
+        for i in 1..=3 {
+            let registration = PendingRegistration {
+                email: format!("user{}@example.com", i),
+                user_name: format!("User {}", i),
+                user_password: format!("password{}", i),
+                user_type: crate::models::UserType::Dev,
+                created_at: now - Duration::minutes(40), // 40分钟前创建（超过30分钟）
+            };
+            state.pending_registrations.lock().unwrap().insert(format!("reg{}", i), registration);
+        }
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 3);
+        
+        // 清理过期的待注册信息（应该全部被清理）
+        state.cleanup_expired_pending_registrations();
+        
+        assert_eq!(state.pending_registrations.lock().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_pending_registration_debug() {
+        let registration = PendingRegistration {
+            email: "test@example.com".to_string(),
+            user_name: "Test User".to_string(),
+            user_password: "password123".to_string(),
+            user_type: crate::models::UserType::Gen,
+            created_at: Utc::now(),
+        };
+        
+        let debug_str = format!("{:?}", registration);
+        assert!(debug_str.contains("PendingRegistration"));
+        assert!(debug_str.contains("email"));
+        assert!(debug_str.contains("user_name"));
+    }
+
+    #[test]
+    fn test_pending_registration_clone() {
+        let registration = PendingRegistration {
+            email: "test@example.com".to_string(),
+            user_name: "Test User".to_string(),
+            user_password: "password123".to_string(),
+            user_type: crate::models::UserType::Gen,
+            created_at: Utc::now(),
+        };
+        
+        let cloned = registration.clone();
+        assert_eq!(registration.email, cloned.email);
+        assert_eq!(registration.user_name, cloned.user_name);
+        assert_eq!(registration.user_password, cloned.user_password);
+        assert_eq!(registration.created_at, cloned.created_at);
     }
 }

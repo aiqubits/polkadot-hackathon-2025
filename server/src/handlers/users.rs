@@ -6,59 +6,61 @@ use axum::{
 use chrono::{DateTime, Utc, Duration};
 use jsonwebtoken::{encode, Header, EncodingKey};
 use rand::Rng;
-use regex::Regex;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::config::{AppState, Claims};
+use crate::config::{AppState, Claims, PendingRegistration};
 use crate::models::{User, UserType, VerificationCode};
-use crate::utils::{generate_wallet, AppError};
+use crate::utils::{generate_wallet, hash_password_with_user_id, verify_password_with_user_id, AppError};
 
 // 注册请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct RegisterRequest {
     pub email: String,
     pub user_name: String,
+    pub user_password: String,
     pub user_type: UserType,
 }
 
 // 注册响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct RegisterResponse {
     pub user_id: Uuid,
     pub message: String,
 }
 
 // 验证请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct VerifyRequest {
     pub email: String,
     pub code: String,
 }
 
 // 验证响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct VerifyResponse {
     pub token: String,
     pub user: UserInfo,
 }
 
 // 登录请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct LoginRequest {
     pub email: String,
+    pub user_password: String,
 }
 
 // 登录响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct LoginResponse {
     pub token: String,
     pub user: UserInfo,
 }
 
 // 用户信息
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UserInfo {
     pub user_id: Uuid,
     pub email: String,
@@ -84,13 +86,25 @@ impl From<User> for UserInfo {
 }
 
 // 用户注册
+#[utoipa::path(
+    post,
+    path = "/api/users/register",
+    tag = "users",
+    summary = "用户注册",
+    description = "注册新用户账户",
+    request_body = RegisterRequest,
+    responses(
+        (status = 200, description = "注册成功", body = RegisterResponse),
+        (status = 400, description = "请求参数错误", body = crate::openapi::ErrorResponse),
+        (status = 422, description = "邮箱已被注册", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<Json<RegisterResponse>, AppError> {
     // 验证邮箱格式
-    let email_regex = Regex::new(r"^[^\s@]+@[^\s@]+\.[^\s@]+$").unwrap();
-    if !email_regex.is_match(&payload.email) {
+    if !crate::utils::is_valid_email(&payload.email) {
         return Err(AppError::BadRequest("邮箱格式不正确".to_string()));
     }
 
@@ -107,40 +121,28 @@ pub async fn register(
         return Err(AppError::UnprocessableEntity("邮箱已被注册".to_string()));
     }
 
-    // 生成钱包地址和私钥
-    let (private_key, wallet_address) = generate_wallet();
-    
-    // 创建用户
-    let user_id = Uuid::new_v4();
-    let now = Utc::now();
+    // 检查是否有相同邮箱的待注册信息
+    let pending_exists = {
+        let pending = state.pending_registrations.lock().unwrap();
+        pending.contains_key(&payload.email)
+    };
 
-    sqlx::query(
-        r#"
-        INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, 0, ?)
-        "#,
-    )
-    .bind(user_id)
-    .bind(&payload.email)
-    .bind(&payload.user_name)
-    .bind(match payload.user_type {
-        UserType::Gen => "gen",
-        UserType::Dev => "dev",
-        UserType::Free => "free",
-        UserType::Premium => "premium",
-    })
-    .bind(&private_key)
-    .bind(&wallet_address)
-    .bind(now.to_rfc3339())
-    .execute(&state.db)
-    .await
-    .map_err(|_| AppError::DatabaseError)?;
+    if pending_exists {
+        return Err(AppError::UnprocessableEntity("该邮箱正在注册中，请先完成验证或等待过期后重试".to_string()));
+    }
+
+    // 验证用户类型
+    match payload.user_type {
+        UserType::Gen | UserType::Dev => (),
+        // _ => return Err(AppError::UnprocessableEntity("无效的用户类型".to_string())),
+    }
 
     // 生成验证码
     let code = generate_verification_code();
+    let now = Utc::now();
     let verification_code = VerificationCode {
         code: code.clone(),
-        expires_at: now + Duration::minutes(5),
+        expires_at: now + Duration::minutes(10),
         email: payload.email.clone(),
     };
 
@@ -150,16 +152,42 @@ pub async fn register(
         verification_code,
     );
 
+    // 存储待验证的注册信息
+    let pending_registration = PendingRegistration {
+        email: payload.email.clone(),
+        user_name: payload.user_name,
+        user_password: payload.user_password,
+        user_type: payload.user_type,
+        created_at: now,
+    };
+
+    state.pending_registrations.lock().unwrap().insert(
+        payload.email.clone(),
+        pending_registration,
+    );
+
     // 模拟发送邮件（实际应用中应该调用邮件服务）
     info!("Verification code for {}: {}", payload.email, code);
 
     Ok(Json(RegisterResponse {
-        user_id,
-        message: "注册成功，验证码已发送到您的邮箱".to_string(),
+        user_id: Uuid::nil(), // 暂时返回空ID，因为用户还未创建
+        message: "注册请求已提交，验证码已发送到您的邮箱，请验证后完成注册".to_string(),
     }))
 }
 
 // 验证邮箱
+#[utoipa::path(
+    post,
+    path = "/api/users/verify",
+    tag = "users",
+    summary = "验证邮箱",
+    description = "使用验证码验证邮箱地址",
+    request_body = VerifyRequest,
+    responses(
+        (status = 200, description = "验证成功", body = VerifyResponse),
+        (status = 400, description = "验证码错误或已过期", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn verify(
     State(state): State<AppState>,
     Json(payload): Json<VerifyRequest>,
@@ -175,17 +203,62 @@ pub async fn verify(
     })?;
 
     if verification_code.code != payload.code || verification_code.expires_at < Utc::now() {
-        return Err(AppError::BadRequest("验证码错误或已过期".to_string()));
+        // 验证失败，清理临时数据
+        state.verification_codes.lock().unwrap().remove(&payload.email);
+        state.pending_registrations.lock().unwrap().remove(&payload.email);
+        return Err(AppError::BadRequest("验证码错误或已过期，注册失败".to_string()));
     }
 
-    // 获取用户信息
-    let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE email = ?",
+    // 获取待验证的注册信息
+    let pending_registration = {
+        let pending = state.pending_registrations.lock().unwrap();
+        pending.get(&payload.email).cloned()
+    };
+
+    let pending_registration = pending_registration.ok_or_else(|| {
+        AppError::BadRequest("注册信息不存在，请重新注册".to_string())
+    })?;
+
+    // 验证通过，开始创建用户
+    // 生成钱包地址和私钥
+    let (private_key, wallet_address) = generate_wallet(&state.password_master_key, &state.password_nonce);
+    
+    // 创建用户
+    let user_id = Uuid::new_v4();
+    let now = Utc::now();
+    
+    // 哈希密码
+    let hashed_password = hash_password_with_user_id(&pending_registration.user_password, user_id, &state.password_salt);
+
+    sqlx::query(
+        r#"
+        INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)
+        "#,
     )
-    .bind(&payload.email)
+    .bind(user_id)
+    .bind(&pending_registration.email)
+    .bind(&pending_registration.user_name)
+    .bind(&hashed_password)
+    .bind(match pending_registration.user_type {
+        UserType::Gen => "gen",
+        UserType::Dev => "dev",
+    })
+    .bind(&private_key)
+    .bind(&wallet_address)
+    .bind(now.to_rfc3339())
+    .execute(&state.db)
+    .await
+    .map_err(|_| AppError::DatabaseError)?;
+
+    // 获取创建的用户信息
+    let user = sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE user_id = ?",
+    )
+    .bind(user_id)
     .fetch_one(&state.db)
     .await
-    .map_err(|_| AppError::NotFound("用户不存在".to_string()))?;
+    .map_err(|_| AppError::DatabaseError)?;
 
     // 生成JWT token
     let claims = Claims::new(user.user_id);
@@ -196,8 +269,9 @@ pub async fn verify(
     )
     .map_err(|_| AppError::InternalServerError)?;
 
-    // 移除验证码
+    // 清理临时数据
     state.verification_codes.lock().unwrap().remove(&payload.email);
+    state.pending_registrations.lock().unwrap().remove(&payload.email);
 
     Ok(Json(VerifyResponse {
         token,
@@ -206,6 +280,19 @@ pub async fn verify(
 }
 
 // 用户登录
+#[utoipa::path(
+    post,
+    path = "/api/users/login",
+    tag = "users",
+    summary = "用户登录",
+    description = "用户登录获取访问令牌",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "登录成功", body = LoginResponse),
+        (status = 401, description = "邮箱或密码错误", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "用户不存在", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
@@ -220,6 +307,11 @@ pub async fn login(
     .map_err(|_| AppError::DatabaseError)?;
 
     let user = user.ok_or_else(|| AppError::NotFound("用户不存在".to_string()))?;
+
+    // 验证密码
+    if !verify_password_with_user_id(&payload.user_password, user.user_id, &user.user_password, &state.password_salt) {
+        return Err(AppError::Unauthorized("邮箱或密码错误".to_string()));
+    }
 
     // 生成JWT token
     let claims = Claims::new(user.user_id);
@@ -237,6 +329,21 @@ pub async fn login(
 }
 
 // 获取用户信息
+#[utoipa::path(
+    get,
+    path = "/api/users/profile",
+    tag = "users",
+    summary = "获取用户资料",
+    description = "获取当前登录用户的详细信息",
+    security(
+        ("bearer_auth" = [])
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = UserInfo),
+        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "用户不存在", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn get_profile(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
@@ -254,7 +361,7 @@ pub async fn get_profile(
 
 // 生成6位数字验证码
 fn generate_verification_code() -> String {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     format!("{:06}", rng.random_range(100000..999999))
 }
 
@@ -262,19 +369,12 @@ fn generate_verification_code() -> String {
 mod tests {
     use super::*;
     use crate::database::{create_pool, init_database};
-    use std::collections::HashMap;
-    use std::sync::{Arc, Mutex};
 
     async fn create_test_state() -> AppState {
         let pool = create_pool().await.expect("Failed to create test pool");
         init_database(&pool).await.expect("Failed to init test database");
         
-        AppState {
-            db: pool,
-            jwt_secret: "test_secret_key_for_testing_purposes_only".to_string(),
-            verification_codes: Arc::new(Mutex::new(HashMap::new())),
-            download_tokens: Arc::new(Mutex::new(HashMap::new())),
-        }
+        AppState::new(pool)
     }
 
     #[test]
@@ -308,6 +408,7 @@ mod tests {
         let request = RegisterRequest {
             email: "test@example.com".to_string(),
             user_name: "Test User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
 
@@ -326,6 +427,7 @@ mod tests {
         let request = RegisterRequest {
             email: "invalid-email".to_string(),
             user_name: "Test User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
 
@@ -345,12 +447,14 @@ mod tests {
         let request1 = RegisterRequest {
             email: "duplicate@example.com".to_string(),
             user_name: "Test User 1".to_string(),
+            user_password: "test_password1".to_string(),
             user_type: UserType::Gen,
         };
 
         let request2 = RegisterRequest {
             email: "duplicate@example.com".to_string(),
             user_name: "Test User 2".to_string(),
+            user_password: "test_password2".to_string(),
             user_type: UserType::Dev,
         };
 
@@ -363,7 +467,9 @@ mod tests {
         assert!(result2.is_err());
         
         match result2.unwrap_err() {
-            AppError::UnprocessableEntity(msg) => assert!(msg.contains("邮箱已被注册")),
+            AppError::UnprocessableEntity(msg) => {
+                assert!(msg.contains("邮箱已被注册") || msg.contains("该邮箱正在注册中"));
+            },
             _ => panic!("Expected UnprocessableEntity error"),
         }
     }
@@ -377,6 +483,7 @@ mod tests {
         let register_request = RegisterRequest {
             email: email.to_string(),
             user_name: "Verify User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
         
@@ -425,6 +532,7 @@ mod tests {
         let register_request = RegisterRequest {
             email: email.to_string(),
             user_name: "Invalid User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
         
@@ -455,6 +563,7 @@ mod tests {
         let register_request = RegisterRequest {
             email: email.to_string(),
             user_name: "Expired User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
         
@@ -496,10 +605,11 @@ mod tests {
         let register_request = RegisterRequest {
             email: email.to_string(),
             user_name: "Login User".to_string(),
+            user_password: "test_password".to_string(),
             user_type: UserType::Gen,
         };
         
-        register(State(state.clone()), Json(register_request)).await.unwrap();
+        let _ = register(State(state.clone()), Json(register_request)).await.unwrap();
         
         // 获取验证码并验证
         let verification_codes = state.verification_codes.lock().unwrap();
@@ -511,11 +621,12 @@ mod tests {
             code,
         };
         
-        verify(State(state.clone()), Json(verify_request)).await.unwrap();
+        let _ = verify(State(state.clone()), Json(verify_request)).await.unwrap();
 
         // 现在测试登录
         let login_request = LoginRequest {
             email: email.to_string(),
+            user_password: "test_password".to_string(),
         };
 
         let result = login(State(state), Json(login_request)).await;
@@ -532,6 +643,7 @@ mod tests {
         
         let login_request = LoginRequest {
             email: "nonexistent@example.com".to_string(),
+            user_password: "any_password".to_string(),
         };
 
         let result = login(State(state), Json(login_request)).await;
@@ -540,6 +652,48 @@ mod tests {
         match result.unwrap_err() {
             AppError::NotFound(msg) => assert!(msg.contains("用户不存在")),
             _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_login_wrong_password() {
+        let state = create_test_state().await;
+        let email = "wrong_password@example.com";
+        
+        // 先注册并验证用户
+        let register_request = RegisterRequest {
+            email: email.to_string(),
+            user_name: "Wrong Password User".to_string(),
+            user_password: "correct_password".to_string(),
+            user_type: UserType::Gen,
+        };
+        
+        let _ = register(State(state.clone()), Json(register_request)).await.unwrap();
+        
+        // 获取验证码并验证
+        let verification_codes = state.verification_codes.lock().unwrap();
+        let code = verification_codes.get(email).unwrap().code.clone();
+        drop(verification_codes);
+        
+        let verify_request = VerifyRequest {
+            email: email.to_string(),
+            code,
+        };
+        
+        let _ = verify(State(state.clone()), Json(verify_request)).await.unwrap();
+
+        // 使用错误密码登录
+        let login_request = LoginRequest {
+            email: email.to_string(),
+            user_password: "wrong_password".to_string(),
+        };
+
+        let result = login(State(state), Json(login_request)).await;
+        assert!(result.is_err());
+        
+        match result.unwrap_err() {
+            AppError::Unauthorized(msg) => assert!(msg.contains("邮箱或密码错误")),
+            _ => panic!("Expected Unauthorized error"),
         }
     }
 }

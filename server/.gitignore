@@ -8,6 +8,7 @@ Cargo.lock
 # 文档
 doc/
 *.html
+uploads/
 
 # 测试覆盖率
 coverage/

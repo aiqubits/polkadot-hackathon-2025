@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id BLOB PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
     user_name TEXT NOT NULL,
+    user_password TEXT NOT NULL,
     user_type TEXT NOT NULL CHECK (user_type IN ('gen', 'dev')),
     private_key TEXT NOT NULL,
     wallet_address TEXT NOT NULL,

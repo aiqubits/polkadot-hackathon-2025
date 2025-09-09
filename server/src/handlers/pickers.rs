@@ -3,31 +3,45 @@ use axum::{
     response::Json,
     Extension,
 };
+
+#[cfg(test)]
+use axum_test::TestServer;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 use crate::config::AppState;
 use crate::models::{Picker, UserType, User};
 use crate::utils::AppError;
 
 // 上传Picker请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct UploadPickerRequest {
+    /// Picker别名
     pub alias: String,
+    /// 描述信息
     pub description: String,
-    pub price: u64,
+    /// 价格（分为单位）
+    pub price: i64,
+    /// 版本号
     pub version: String,
+    /// 图片文件
+    #[schema(value_type = String, format = Binary)]
+    pub image: (),
+    /// Picker文件
+    #[schema(value_type = String, format = Binary)]
+    pub file: (),
 }
 
 // 上传Picker响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct UploadPickerResponse {
     pub picker_id: Uuid,
     pub message: String,
 }
 
 // 市场查询参数
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct MarketQuery {
     pub page: Option<u32>,
     pub size: Option<u32>,
@@ -35,7 +49,7 @@ pub struct MarketQuery {
 }
 
 // Picker信息
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct PickerInfo {
     pub picker_id: Uuid,
     pub alias: String,
@@ -48,13 +62,34 @@ pub struct PickerInfo {
 }
 
 // 市场响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct MarketResponse {
     pub pickers: Vec<PickerInfo>,
     pub total: u64,
 }
 
 // 上传Picker
+#[utoipa::path(
+    post,
+    path = "/api/pickers",
+    tag = "pickers",
+    summary = "上传新的Picker",
+    description = "开发者上传新的Picker到市场",
+    security(
+        ("bearer_auth" = [])
+    ),
+    request_body(
+        content = UploadPickerRequest,
+        content_type = "multipart/form-data",
+        description = "Picker文件和信息"
+    ),
+    responses(
+        (status = 200, description = "上传成功", body = UploadPickerResponse),
+        (status = 400, description = "请求参数错误或非开发者用户", body = crate::openapi::ErrorResponse),
+        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn upload_picker(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
@@ -113,7 +148,7 @@ pub async fn upload_picker(
                 tokio::fs::write(&image_path, data).await.map_err(|_| AppError::InternalServerError)?;
             }
             "file" => {
-                let filename = field.file_name().unwrap_or("picker.exe").to_string();
+                let filename = field.file_name().unwrap_or("picker_unknown.exe").to_string();
                 let data = field.bytes().await.map_err(|_| AppError::BadRequest("Invalid file data".to_string()))?;
                 
                 // 创建上传目录
@@ -166,12 +201,30 @@ pub async fn upload_picker(
 }
 
 // 获取市场列表
+#[utoipa::path(
+    get,
+    path = "/api/pickers",
+    tag = "pickers",
+    summary = "获取Picker市场列表",
+    description = "获取可用的Picker列表，支持分页和搜索",
+    params(
+        ("page" = Option<u32>, Query, description = "页码，默认为1"),
+        ("size" = Option<u32>, Query, description = "每页数量，默认为10"),
+        ("keyword" = Option<String>, Query, description = "搜索关键词")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = MarketResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn get_market(
     State(state): State<AppState>,
     Query(query): Query<MarketQuery>,
 ) -> Result<Json<MarketResponse>, AppError> {
     let page = query.page.unwrap_or(1);
     let size = query.size.unwrap_or(10);
+    // 确保page至少为1，防止减法溢出
+    let page = if page < 1 { 1 } else { page };
     let offset = (page - 1) * size;
 
     // 构建查询条件和获取数据
@@ -241,6 +294,21 @@ pub async fn get_market(
 }
 
 // 获取Picker详情
+#[utoipa::path(
+    get,
+    path = "/api/pickers/{picker_id}",
+    tag = "pickers",
+    summary = "获取Picker详情",
+    description = "根据ID获取特定Picker的详细信息",
+    params(
+        ("picker_id" = uuid::Uuid, Path, description = "Picker的唯一标识符")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = PickerInfo),
+        (status = 404, description = "Picker不存在", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn get_picker_detail(
     State(state): State<AppState>,
     Path(picker_id): Path<Uuid>,
@@ -269,8 +337,8 @@ pub async fn get_picker_detail(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_app_state;
-    use crate::models::{OrderStatus};
+    use crate::utils_tests::create_test_app_state;
+    // use crate::models::{OrderStatus};
     use axum::extract::{Query, State, Path};
     use chrono::Utc;
     use serial_test::serial;
@@ -286,8 +354,8 @@ mod tests {
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -332,14 +400,14 @@ mod tests {
     async fn test_get_market_with_keyword_search() {
         let state = create_test_app_state().await;
         let dev_user_id = Uuid::new_v4();
-        let picker_id1 = Uuid::new_v4();
-        let picker_id2 = Uuid::new_v4();
+        // let picker_id1 = Uuid::new_v4();
+        // let picker_id2 = Uuid::new_v4();
 
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -406,8 +474,8 @@ mod tests {
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -459,8 +527,8 @@ mod tests {
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -510,8 +578,8 @@ mod tests {
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -559,5 +627,268 @@ mod tests {
             AppError::NotFound(msg) => assert_eq!(msg, "Picker not found"),
             _ => panic!("Expected NotFound error"),
         }
+    }
+
+    // 新增测试用例：测试非开发者用户上传Picker
+
+    #[tokio::test]
+    #[serial]
+    async fn test_upload_picker_non_dev_user() {
+        let state = create_test_app_state().await;
+        let non_dev_user_id = Uuid::new_v4();
+
+        // 创建测试非开发者用户 (使用Gen类型)
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'gen@test.com', 'Gen User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 0, ?)
+            "#,
+        )
+        .bind(non_dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试路由
+        use axum::Router;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+        
+        let app = Router::new()
+            .route("/api/pickers", axum::routing::post(upload_picker))
+            .layer(axum::middleware::from_fn_with_state(state.clone(), move |State(_state): State<AppState>, mut request: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| async move {
+                request.extensions_mut().insert(non_dev_user_id);
+                next.run(request).await
+            }))
+            .with_state(state.clone());
+
+        // 创建multipart请求体
+        let boundary = "boundary123";
+        let body = format!("--{}\r\n\r\n--{}--\r\n", boundary, boundary);
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/pickers")
+            .header("content-type", format!("multipart/form-data; boundary={}", boundary))
+            .body(axum::body::Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // 新增测试用例：测试上传Picker时缺少必填字段
+    #[tokio::test]
+    #[serial]
+    async fn test_upload_picker_missing_fields() {
+        let state = create_test_app_state().await;
+        let dev_user_id = Uuid::new_v4();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试路由
+        use axum::Router;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+        
+        let app = Router::new()
+            .route("/api/pickers", axum::routing::post(upload_picker))
+            .layer(axum::middleware::from_fn_with_state(state.clone(), move |State(_state): State<AppState>, mut request: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| async move {
+                request.extensions_mut().insert(dev_user_id);
+                next.run(request).await
+            }))
+            .with_state(state.clone());
+
+        // 创建空的multipart请求体
+        let boundary = "boundary123";
+        let body = format!("--{boundary}--\r\n");
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/pickers")
+            .header("content-type", format!("multipart/form-data; boundary={boundary}"))
+            .body(axum::body::Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    // 新增测试用例：测试get_market空结果
+    #[tokio::test]
+    #[serial]
+    async fn test_get_market_empty_result() {
+        let state = create_test_app_state().await;
+
+        let query = MarketQuery {
+            page: Some(1),
+            size: Some(10),
+            keyword: Some("nonexistent".to_string()),
+        };
+
+        let result = get_market(State(state), Query(query)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.pickers.len(), 0);
+        assert_eq!(response.total, 0);
+    }
+
+    // 新增测试用例：测试get_market无效分页参数
+    #[tokio::test]
+    #[serial]
+    async fn test_get_market_invalid_pagination() {
+        let state = create_test_app_state().await;
+        let dev_user_id = Uuid::new_v4();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建一个测试Picker
+        let picker_id = Uuid::new_v4();
+        let now = Utc::now();
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(now.to_rfc3339())
+        .bind(now.to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        let query = MarketQuery {
+            page: Some(0), // 无效页码
+            size: Some(10),
+            keyword: None,
+        };
+
+        let result = get_market(State(state), Query(query)).await;
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        // 当page为0时，offset会是负数，但SQL查询会处理这种情况
+        // 我们期望仍然能获取到数据
+        assert_eq!(response.pickers.len(), 1);
+        assert_eq!(response.total, 1);
+    }
+
+    // 新增测试用例：测试get_picker_detail非活跃Picker
+    #[tokio::test]
+    #[serial]
+    async fn test_get_picker_detail_inactive_picker() {
+        let state = create_test_app_state().await;
+        let dev_user_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建一个非活跃的测试Picker
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'inactive', 10, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        let result = get_picker_detail(State(state), Path(picker_id)).await;
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            AppError::NotFound(msg) => assert_eq!(msg, "Picker not found"),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    // 新增测试用例：测试上传Picker成功场景
+    #[tokio::test]
+    #[serial]
+    async fn test_upload_picker_success() {
+        let state = create_test_app_state().await;
+        let dev_user_id = Uuid::new_v4();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试路由
+        use axum::Router;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+        
+        let app = Router::new()
+            .route("/api/pickers", axum::routing::post(upload_picker))
+            .layer(axum::middleware::from_fn_with_state(state.clone(), move |State(_state): State<AppState>, mut request: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| async move {
+                request.extensions_mut().insert(dev_user_id);
+                next.run(request).await
+            }))
+            .with_state(state.clone());
+
+        // 创建multipart请求体
+        let boundary = "boundary123";
+        let body = format!("--{boundary}\r\nContent-Disposition: form-data; name=\"alias\"\r\n\r\nTest Picker\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"description\"\r\n\r\nTest Description\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"price\"\r\n\r\n500\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"version\"\r\n\r\n1.0\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"image\"; filename=\"test.jpg\"\r\nContent-Type: image/jpeg\r\n\r\ntest_image_data\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.exe\"\r\nContent-Type: application/octet-stream\r\n\r\ntest_file_data\r\n--{boundary}--\r\n");
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/pickers")
+            .header("content-type", format!("multipart/form-data; boundary={boundary}"))
+            .body(axum::body::Body::from(body))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

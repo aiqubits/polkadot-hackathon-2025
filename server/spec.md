@@ -15,6 +15,7 @@
 - `user_id` (UUID) - 主键
 - `email` - 邮箱地址
 - `user_name` - 用户昵称
+- `user_password` - 用户密码(加密存储) 使用的 salt 是 user_id<UUID>字符串与"openpick"字符串的组合，这样使得每个用户的密码都有独立的加密salt，密码存储更加安全
 - `user_type` - 身份类型 (gen/dev)
 - `private_key` - 钱包地址 (加密存储)
 - `wallet_address` - 钱包地址

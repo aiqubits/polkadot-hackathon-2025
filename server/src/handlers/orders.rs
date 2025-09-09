@@ -1,3 +1,7 @@
+use std::ops::{Div, Mul};
+use reqwest;
+use serde_json;
+
 use axum::{
     extract::{Query, State, Path},
     response::Json,
@@ -5,29 +9,37 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use tracing::info;
 use uuid::Uuid;
+use std::time::Duration;
 
 use crate::config::AppState;
-use crate::models::{Order, OrderStatus, PayType, User, UserType, Picker};
-use crate::utils::AppError;
+use crate::models::{Order, OrderStatus, PayType, User, Picker};
+use crate::utils::{AppError, decrypt_private_key};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::primitives::Address;
+use alloy::sol;
+use alloy::primitives::{U256, FixedBytes};
+use alloy::signers::local::PrivateKeySigner;
+use alloy::rpc::types::TransactionReceipt;
 
 // 创建订单请求
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateOrderRequest {
     pub picker_id: Uuid,
     pub pay_type: PayType,
 }
 
 // 创建订单响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct CreateOrderResponse {
     pub order_id: Uuid,
     pub message: String,
 }
 
 // 订单查询参数
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, ToSchema)]
 pub struct OrderQuery {
     pub page: Option<u32>,
     pub size: Option<u32>,
@@ -35,7 +47,7 @@ pub struct OrderQuery {
 }
 
 // 订单信息
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrderInfo {
     pub order_id: Uuid,
     pub user_id: Uuid,
@@ -48,7 +60,7 @@ pub struct OrderInfo {
 }
 
 // 订单列表响应
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, ToSchema)]
 pub struct OrderListResponse {
     pub orders: Vec<OrderInfo>,
     pub total: u64,
@@ -58,27 +70,47 @@ pub struct OrderListResponse {
 }
 
 // 创建订单
+#[utoipa::path(
+    post,
+    path = "/api/orders",
+    tag = "orders",
+    summary = "创建订单",
+    description = "为指定的Picker创建订单，支持Premium和钱包支付两种方式",
+    request_body(content = CreateOrderRequest, description = "创建订单请求参数", content_type = "application/json"),
+    responses(
+        (status = 200, description = "订单创建成功", body = CreateOrderResponse),
+        (status = 400, description = "请求参数错误", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "用户或Picker不存在", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
 pub async fn create_order(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
     Json(payload): Json<CreateOrderRequest>,
 ) -> Result<Json<CreateOrderResponse>, AppError> {
-    info!("create_order called with user_id: {}, picker_id: {}, pay_type: {:?}", user_id, payload.picker_id, payload.pay_type);
+    info!("Creating order for user: {}, picker: {}, pay_type: {:?}", user_id, payload.picker_id, payload.pay_type);
+    
     // 获取用户信息
     info!("Fetching user information...");
     let user_result = sqlx::query_as::<_, User>(
         "SELECT * FROM users WHERE user_id = ?",
     )
     .bind(user_id)
-    .fetch_one(&state.db)
+    .fetch_optional(&state.db)
     .await;
     
     match &user_result {
-        Ok(user) => info!("User found: {:?}", user),
+        Ok(Some(user)) => info!("User found: {:?}", user),
+        Ok(None) => info!("User not found"),
         Err(e) => info!("Failed to fetch user: {:?}", e),
     }
     
-    let user = user_result.map_err(|_| AppError::NotFound("User not found".to_string()))?;
+    let user = user_result.map_err(|_| AppError::NotFound("User not found".to_string()))?
+        .ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     // 获取Picker信息
     info!("Fetching picker information...");
@@ -102,29 +134,233 @@ pub async fn create_order(
     // 检查支付方式和余额
     match payload.pay_type {
         PayType::Premium => {
+            info!("Processing premium payment, user balance: {}, picker price: {}", user.premium_balance, picker.price);
             if user.premium_balance < picker.price {
                 return Err(AppError::BadRequest("Insufficient premium balance".to_string()));
             }
         }
         PayType::Wallet => {
-            // 这里应该检查钱包余额，暂时跳过
+            info!("Processing wallet payment for address: {}, picker price: {}", user.wallet_address, picker.price);
+            
+            // 测试环境下跳过真实区块链操作
+            if cfg!(not(test)) {
+                // 解密用户私钥
+                let private_key_plaintext = decrypt_private_key(&user.private_key, &state.password_master_key, &state.password_nonce).map_err(|e| {
+                    tracing::error!("Decryption to plaintext failed: {:?}", e);
+                    AppError::InternalServerError
+                })?;
+
+                // 初始化签名器（使用用户的私钥明文）    
+                let user_signer: PrivateKeySigner = private_key_plaintext.parse().map_err(|e| {
+                    tracing::error!("Invalid private key: {}", e);
+                    AppError::InternalServerError
+                })?;
+
+                // 初始化provider
+                let provider = ProviderBuilder::new()
+                    .wallet(user_signer)
+                    .connect_http(state.blockchain_rpc_url.parse().map_err(|e| {
+                        tracing::error!("Invalid RPC URL: {}", e);
+                        AppError::InternalServerError
+                    })?);
+                
+                // 检查钱包余额
+                info!("Blockchain RPC URL: {}", state.blockchain_rpc_url);
+                info!("Parsing wallet address: {}", user.wallet_address);
+                let address: Address = user.wallet_address.parse().map_err(|e| {
+                    tracing::error!("Invalid wallet address: {} - {}", user.wallet_address, e);
+                    AppError::BadRequest("Invalid wallet address".to_string())
+                })?;
+                info!("Parsed wallet address successfully: {}", address);
+                
+                // 获取钱包余额
+                info!("Getting wallet balance for address: {}", address);
+                let balance = provider.get_balance(address).await.map_err(|e| {
+                    tracing::error!("Failed to get wallet balance: {}", e);
+                    AppError::InternalServerError
+                })?;
+                
+                // 检查钱包余额是否足够支付订单金额
+                let order_amount_in_wei = alloy::primitives::U256::from(picker.price);
+                info!("Wallet balance: {}, order amount: {}", balance, order_amount_in_wei);
+                if balance < order_amount_in_wei {
+                    return Err(AppError::BadRequest("Insufficient wallet balance".to_string()));
+                }
+                
+                // 记录钱包支付信息
+                tracing::info!("Wallet balance check passed for address: {}, balance: {} wei", user.wallet_address, balance);
+            } else {
+                // 测试环境下模拟余额足够
+                info!("Test environment: skipping real blockchain operations and balance check");
+            }
         }
     }
+
+    let pay_rate = (state.payment_rate as f32).div(100.00);
+    info!("PAYMENT RATE: {}", pay_rate);
+
+    // 查找用户钱包地址
+    // let user_wallet_address = user.wallet_address;
+
+    // 查找picker开发者钱包地址
+    let dev_uid = picker.dev_user_id;
+    let dev_user_result = sqlx::query_as::<_, User>(
+        "SELECT * FROM users WHERE user_id = ?",
+    )    
+    .bind(dev_uid)
+    .fetch_optional(&state.db)
+    .await;
+
+    match &dev_user_result {
+        Ok(Some(picker)) => info!("Picker found: {:?}", picker),
+        Ok(None) => info!("Picker not found"),
+        Err(e) => info!("Failed to fetch picker: {:?}", e),
+    }
+
+    let dev_user = dev_user_result.map_err(|_| AppError::NotFound("Dev User not found".to_string()))?
+        .ok_or_else(|| AppError::NotFound("Dev User not found".to_string()))?;
 
     // 创建订单
     let order_id = Uuid::new_v4();
     let now = Utc::now();
     let expires_at = now + chrono::Duration::hours(1); // 订单1小时后过期
     let tx_hash = if matches!(payload.pay_type, PayType::Wallet) {
-        Some(Uuid::new_v4().to_string()) // 为钱包支付生成交易哈希
+        // 执行链上转账操作，获取交易hash
+        // 调用授权支付合约的pay方法，转移用户钱包的代币
+        // user.wallet_address ---> devWalletAddress
+        // 合约的pay 签名
+        // function pay(
+        //     bytes32 pickerId,
+        //     uint256 devUserId,
+        //     address devWalletAddress
+        // ) external payable;
+        // 生成合约绑定
+        sol! {
+            #[sol(rpc)]
+            contract PickerPayment {
+                function pay(bytes16 pickerId, bytes16 devUserId, address devWalletAddress) external payable;
+            }
+        }
+        
+        // 判断是否为测试环境
+        if cfg!(test) {
+            // 测试环境下，直接返回一个模拟的交易哈希，不进行实际的区块链操作
+            "0x7d31e067414e87c232e46606a9d3b4ba3a8f2a5a50b8b1a541b4d391a485c33d".to_string()
+        } else {
+            // 生产环境下执行实际的区块链操作
+            // 解密用户私钥
+            let private_key_plaintext = decrypt_private_key(&user.private_key, &state.password_master_key, &state.password_nonce).map_err(|e| {
+                tracing::error!("Decryption to plaintext failed: {:?}", e);
+                AppError::InternalServerError
+            })?;
+
+            // 初始化签名器（使用用户的私钥明文）
+            let user_signer: PrivateKeySigner = private_key_plaintext.parse().map_err(|e| {
+                tracing::error!("Invalid private key: {}", e);
+                AppError::InternalServerError
+            })?;
+
+            // 初始化provider
+            let provider = ProviderBuilder::new()
+                .wallet(user_signer)
+                .connect_http(state.blockchain_rpc_url.parse().map_err(|e| {
+                    tracing::error!("Invalid RPC URL: {}", e);
+                    AppError::InternalServerError
+                })?);
+
+            // 准备参数
+            let picker_id_bytes = FixedBytes::from_slice(&payload.picker_id.as_bytes()[0..32]);
+            let dev_user_id_bytes = FixedBytes::from_slice(&dev_user.user_id.as_bytes()[0..32]);
+            // dev_user_id_bytes[16..32].copy_from_slice(&dev_user.user_id.as_bytes()[0..16]); // 填充到32字节
+            // let dev_user_id_u256 = U256::from_be_bytes(dev_user_id_bytes);
+
+            let dev_wallet = dev_user.wallet_address.parse::<Address>().map_err(|e| {
+                tracing::error!("Invalid developer wallet address: {}", e);
+                AppError::InternalServerError
+            })?;
+            
+            // 配置合约地址
+            let contract_address = state.blockchain_authorized_contract_address.parse().map_err(|e| {
+                    tracing::error!("Invalid Authorized Contract Address: {}", e);
+                    AppError::InternalServerError
+                })?;
+            
+            // 创建合约实例
+            let contract = PickerPayment::new(contract_address, provider);
+            
+            // 构建并发送交易
+            let token_usdt_url: String = state.blockchain_token_usdt_url.parse().map_err(|e| {
+                    tracing::error!("Invalid Token Usdt URL: {}", e);
+                    AppError::InternalServerError
+                })?;
+            
+            // 使用reqwest请求token_usdt_url获取CFX Token价格
+            let client = reqwest::Client::new();
+            let response = client.get(&token_usdt_url)
+                .send()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to fetch CFX price: {}", e);
+                    AppError::InternalServerError
+                })?;
+
+            // 解析JSON响应
+            let json_response: serde_json::Value = response.json()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to parse CFX price response: {}", e);
+                    AppError::InternalServerError
+                })?;
+
+            // 检查响应是否成功
+            if json_response.get("code").and_then(|c| c.as_str()) != Some("0") {
+                let error_msg = json_response.get("msg").and_then(|m| m.as_str()).unwrap_or("Unknown error");
+                tracing::error!("CFX price API returned error: {}", error_msg);
+                return Err(AppError::InternalServerError);
+            }
+
+            // 获取data数组中的第一个元素的last字段（CFX价格）
+            let cfx_price = json_response.get("data")
+                .and_then(|data| data.as_array())
+                .and_then(|data_array| data_array.get(0))
+                .and_then(|item| item.get("last"))
+                .and_then(|last| last.as_str())
+                .and_then(|last_str| last_str.parse::<f64>().ok())
+                .ok_or_else(|| {
+                    tracing::error!("Failed to extract CFX price from response");
+                    AppError::InternalServerError
+                })?;
+
+            // 计算订单金额（picker.price / cfx_price）并转换为U256
+            let order_amount_float = (picker.price as f64).div(cfx_price);
+            // 由于U256不支持直接从浮点数转换，我们需要先转换为整数（乘以10^18来保留精度）
+            let order_amount = U256::from((order_amount_float * 10_f64.powf(18.0)) as u128);
+
+            // 记录日志
+            info!("BlockChain Token price: {:.6}, order_amount_float: {:.6}, order_amount (wei): {}", 
+                cfx_price, order_amount_float, order_amount);
+
+            let pending_tx = contract
+                .pay(picker_id_bytes, dev_user_id_bytes, dev_wallet)
+                .value(order_amount)
+                .send()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to send transaction: {}", e);
+                    AppError::InternalServerError
+                })?;
+            
+            // 获取交易哈希字符串
+            format!("0x{}", hex::encode(pending_tx.tx_hash()))
+        }
     } else {
-        None
+        "".to_string()
     };
     
     info!("Creating order with ID: {}", order_id);
     info!("User ID: {}", user_id);
     info!("Picker ID: {}", payload.picker_id);
-    info!("Picker price: {}", picker.price);
+    info!("Picker price premium: {}", picker.price);
     info!("Pay type: {:?}", payload.pay_type);
     info!("Order status: {:?}", OrderStatus::Pending);
     info!("TX hash: {:?}", tx_hash);
@@ -191,7 +427,7 @@ pub async fn create_order(
         result.map_err(|_| AppError::DatabaseError)?;
     }
 
-    // 扣除用户余额（如果是Premium支付）
+    // 扣除用户余额，并增加开发者账户余额（如果是Premium支付）
     if matches!(payload.pay_type, PayType::Premium) {
         info!("Processing premium payment...");
         let result = sqlx::query(
@@ -205,6 +441,25 @@ pub async fn create_order(
         match &result {
             Ok(_) => info!("User balance updated successfully"),
             Err(e) => info!("Failed to update user balance: {:?}", e),
+        }
+        
+        result.map_err(|_| AppError::DatabaseError)?;
+
+        let increase_balance_to_dev = picker.price.checked_sub((picker.price as f32).mul(pay_rate) as i64).unwrap_or_default();
+
+        info!("Increase balance to dev: {}", increase_balance_to_dev);
+
+        let result = sqlx::query(
+            "UPDATE users SET premium_balance = premium_balance + ? WHERE user_id = ?",
+        )
+        .bind(increase_balance_to_dev)
+        .bind(dev_uid)
+        .execute(&mut *tx)
+        .await;
+        
+        match &result {
+            Ok(_) => info!("Developer balance updated successfully"),
+            Err(e) => info!("Failed to update Developer balance: {:?}", e),
         }
         
         result.map_err(|_| AppError::DatabaseError)?;
@@ -241,6 +496,90 @@ pub async fn create_order(
         }
         
         result.map_err(|_| AppError::DatabaseError)?;
+    } else {
+        // 实现重试机制，查询链上钱包交易状态是否成功
+        if !tx_hash.is_empty() {
+            info!("开始查询交易状态，交易哈希: {}", tx_hash);
+            
+            // 将交易哈希字符串转换为TxHash类型
+            let tx_hash_parsed = tx_hash.parse().map_err(|e| {
+                tracing::error!("无效的交易哈希: {} - {}", tx_hash, e);
+                AppError::InternalServerError
+            })?;
+            
+            // 创建provider用于查询交易状态
+            let provider = ProviderBuilder::new().connect_http(state.blockchain_rpc_url.parse().map_err(|e| {
+                tracing::error!("Invalid RPC URL: {}", e);
+                AppError::InternalServerError
+            })?);
+            
+            // 调用带重试机制的函数查询交易回执
+            if let Ok(Some(receipt)) = get_receipt_with_retry(&provider, tx_hash_parsed, state.blockchain_retry_times as u32, state.blockchain_retry_interval_seconds).await {
+                info!("交易状态: {}, 区块号: {:?}", if receipt.status() { "成功" } else { "失败" }, receipt.block_number);
+                
+                // 如果交易成功，更新订单状态和增加下载次数
+                if receipt.status() {
+                    info!("交易成功，更新订单状态和Picker下载次数");
+                    
+                    // 更新订单状态为成功
+                    let result = sqlx::query(
+                        "UPDATE orders SET status = ? WHERE order_id = ?",
+                    )
+                    .bind(&OrderStatus::Success)
+                    .bind(order_id)
+                    .execute(&mut *tx)
+                    .await;
+                    
+                    match &result {
+                        Ok(_) => info!("订单状态更新成功"),
+                        Err(e) => info!("Failed to update order status: {:?}", e),
+                    }
+                    
+                    result.map_err(|_| AppError::DatabaseError)?;
+                    
+                    // 增加Picker下载次数
+                    let result = sqlx::query(
+                        "UPDATE pickers SET download_count = download_count + 1 WHERE picker_id = ?",
+                    )
+                    .bind(payload.picker_id)
+                    .execute(&mut *tx)
+                    .await;
+                    
+                    match &result {
+                        Ok(_) => info!("Picker下载次数更新成功"),
+                        Err(e) => info!("Failed to update picker download count: {:?}", e),
+                    }
+                    
+                    result.map_err(|_| AppError::DatabaseError)?;
+                } else {
+                    info!("交易失败，订单保持待处理状态");
+                }
+            } else {
+                info!("未能获取交易回执，订单保持待处理状态");
+            }
+        }
+        
+        // 带重试机制的交易回执查询函数
+        async fn get_receipt_with_retry<P: Provider>(
+            provider: &P,
+            tx_hash: FixedBytes<32>,
+            max_retries: u32,
+            retry_interval_seconds: i8,
+        ) -> Result<Option<TransactionReceipt>, AppError> {
+            for attempt in 1..=max_retries {
+                match provider.get_transaction_receipt(tx_hash).await {
+                    Ok(receipt) => return Ok(receipt),
+                    Err(e) => {
+                        info!("尝试 {} 获取交易回执失败: {}, 等待 {} 秒后重试", 
+                              attempt, e, retry_interval_seconds);
+                        if attempt < max_retries {
+                            tokio::time::sleep(Duration::from_secs(retry_interval_seconds as u64)).await;
+                        }
+                    }
+                }
+            }
+            Err(AppError::InternalServerError)
+        }  
     }
 
     // 提交事务
@@ -254,6 +593,7 @@ pub async fn create_order(
     
     result.map_err(|_| AppError::DatabaseError)?;
 
+    info!("Order created successfully with ID: {}", order_id);
     Ok(Json(CreateOrderResponse {
         order_id,
         message: "Order created successfully".to_string(),
@@ -261,6 +601,26 @@ pub async fn create_order(
 }
 
 // 获取用户订单列表
+#[utoipa::path(
+    get,
+    path = "/api/orders",
+    tag = "orders",
+    summary = "获取用户订单列表",
+    description = "获取当前用户的所有订单，支持分页和状态筛选",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("page" = Option<u32>, Query, description = "页码，默认为1"),
+        ("size" = Option<u32>, Query, description = "每页数量，默认为10"),
+        ("status" = Option<OrderStatus>, Query, description = "订单状态筛选")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = OrderListResponse),
+        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn get_user_orders(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
@@ -362,16 +722,35 @@ pub async fn get_user_orders(
 }
 
 // 获取订单详情
+#[utoipa::path(
+    get,
+    path = "/api/orders/{order_id}",
+    tag = "orders",
+    summary = "获取订单详情",
+    description = "根据订单ID获取订单的详细信息",
+    security(
+        ("bearer_auth" = [])
+    ),
+    params(
+        ("order_id" = uuid::Uuid, Path, description = "订单的唯一标识符")
+    ),
+    responses(
+        (status = 200, description = "获取成功", body = OrderInfo),
+        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "订单不存在", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn get_order_detail(
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
     Path(order_id): Path<Uuid>,
 ) -> Result<Json<OrderInfo>, AppError> {
-    info!("get_order_detail called with order_id: {}, user_id: {}", order_id, user_id);
+    // info!("get_order_detail called with order_id: {}, user_id: {}", order_id, user_id);
     
     // 获取订单信息
     let order_query = "SELECT * FROM orders WHERE order_id = ? AND user_id = ?";
-    info!("Executing query: {}", order_query);
+    // info!("Executing query: {}", order_query);
     let order_result = sqlx::query_as::<_, Order>(order_query)
         .bind(order_id)
         .bind(user_id)
@@ -390,19 +769,25 @@ pub async fn get_order_detail(
 
     // 获取Picker信息
     let picker_query = "SELECT * FROM pickers WHERE picker_id = ?";
-    info!("Executing picker query: {}", picker_query);
+    // info!("Executing picker query: {}", picker_query);
     let picker_result = sqlx::query_as::<_, Picker>(picker_query)
         .bind(order.picker_id)
-        .fetch_one(&state.db)
+        .fetch_optional(&state.db)
         .await;
     
     match &picker_result {
-        Ok(picker) => info!("Picker found: {:?}", picker),
-        Err(e) => info!("Error fetching picker: {}", e),
+        Ok(Some(picker)) => info!("Picker found: {:?}", picker),
+        Ok(None) => {
+            info!("Picker not found");
+            return Err(AppError::NotFound("Picker not found".to_string()));
+        },
+        Err(e) => {
+            info!("Error fetching picker: {}", e);
+            return Err(AppError::DatabaseError);
+        }
     }
     
-    let picker = picker_result
-        .map_err(|_| AppError::DatabaseError)?;
+    let picker = picker_result.unwrap().unwrap();
 
     let order_info = OrderInfo {
         order_id: order.order_id,
@@ -415,7 +800,7 @@ pub async fn get_order_detail(
         created_at: order.created_at,
     };
     
-    info!("Returning order info: {:?}", order_info);
+    // info!("Returning order info: {:?}", order_info);
     
     Ok(Json(order_info))
 }
@@ -423,7 +808,7 @@ pub async fn get_order_detail(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_app_state;
+    use crate::utils_tests::create_test_app_state;
     use crate::models::{PayType, OrderStatus};
     use axum::extract::{State, Path};
     use axum::Extension;
@@ -440,30 +825,40 @@ mod tests {
         let picker_id = Uuid::new_v4();
 
         // 创建测试用户
-        sqlx::query(
+        // info!("Creating test user...");
+        let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', '59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d', '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', 1000, ?)
             "#,
         )
         .bind(user_id)
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await
-        .unwrap();
+        .await;
+        
+        info!("Insert user result: {:?}", result);
+        result.unwrap();
 
         // 创建测试开发者用户
-        sqlx::query(
+        // info!("Creating test dev user...");
+        let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', '0xabcdef1234567890abcdef1234567890abcdef12', 0, ?)
             "#,
         )
         .bind(dev_user_id)
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await
-        .unwrap();
+        .await;
+        
+        match &result {
+            Ok(_) => info!("Test dev user created successfully"),
+            Err(e) => info!("Failed to create test dev user: {:?}", e),
+        }
+        
+        result.unwrap();
 
         // 创建测试Picker
         let result = sqlx::query(
@@ -477,8 +872,14 @@ mod tests {
         .bind(Utc::now().to_rfc3339())
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await
-        .unwrap();
+        .await;
+        
+        match &result {
+            Ok(_) => info!("Test picker created successfully"),
+            Err(e) => info!("Failed to create test picker: {:?}", e),
+        }
+        
+        result.unwrap();
         
         let request = CreateOrderRequest {
             picker_id,
@@ -525,8 +926,8 @@ mod tests {
         // 创建测试用户（余额不足）
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-        VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 100, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+        VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', '0x1234567890123456789012345678901234567890', 100, ?)
             "#,
         )
         .bind(user_id)
@@ -538,8 +939,8 @@ mod tests {
         // 创建测试开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', '0xabcdef1234567890abcdef1234567890abcdef12', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -591,8 +992,8 @@ mod tests {
         // 创建测试用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', '0x1234567890123456789012345678901234567890', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -622,22 +1023,22 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_create_order_wallet_success() {
-        info!("Starting test_create_order_wallet_success");
+        // info!("Starting test_create_order_wallet_success");
         let state = create_test_app_state().await;
         let user_id = Uuid::new_v4();
         let dev_user_id = Uuid::new_v4();
         let picker_id = Uuid::new_v4();
         
-        info!("User ID: {}", user_id);
-        info!("Dev User ID: {}", dev_user_id);
-        info!("Picker ID: {}", picker_id);
+        // info!("User ID: {}", user_id);
+        // info!("Dev User ID: {}", dev_user_id);
+        // info!("Picker ID: {}", picker_id);
 
         // 创建测试用户
-        info!("Creating test user...");
+        // info!("Creating test user...");
         let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', '0x1234567890123456789012345678901234567890', 0, ?)
             "#,
         )
         .bind(user_id)
@@ -653,11 +1054,11 @@ mod tests {
         result.unwrap();
 
         // 创建测试开发者用户
-        info!("Creating test dev user...");
+        // info!("Creating test dev user...");
         let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', '0xabcdef1234567890abcdef1234567890abcdef12', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -673,7 +1074,7 @@ mod tests {
         result.unwrap();
 
         // 创建测试Picker
-        info!("Creating test picker...");
+        // info!("Creating test picker...");
         let now = Utc::now();
         let result = sqlx::query(
             r#"
@@ -700,7 +1101,7 @@ mod tests {
             pay_type: PayType::Wallet,
         };
         
-        info!("Calling create_order...");
+        // info!("Calling create_order...");
 
         let result = create_order(
             State(state.clone()),
@@ -708,7 +1109,17 @@ mod tests {
             Json(request),
         ).await;
         
-        info!("create_order result: {:?}", result);
+        // info!("create_order result: {:?}", result);
+        
+        // 添加详细的错误信息输出
+        match &result {
+            Ok(_) => info!("Order creation succeeded"),
+            Err(e) => {
+                info!("Order creation failed with error: {:?}", e);
+                // 让测试失败并显示错误信息
+                panic!("Order creation failed with error: {:?}", e);
+            },
+        }
 
         assert!(result.is_ok());
 
@@ -722,11 +1133,11 @@ mod tests {
             .fetch_one(&state.db)
             .await
             .unwrap();
-        info!("Order status: {:?}", order.status);
+        // info!("Order status: {:?}", order.status);
         assert_eq!(order.status, OrderStatus::Pending);
-        info!("Order tx_hash: {:?}", order.tx_hash);
+        // info!("Order tx_hash: {:?}", order.tx_hash);
         assert!(order.tx_hash.is_some());
-        info!("Order expires_at: {:?}", order.expires_at);
+        // info!("Order expires_at: {:?}", order.expires_at);
         assert!(order.expires_at.is_some());
 
         // 验证Picker下载次数没有增加
@@ -735,7 +1146,7 @@ mod tests {
             .fetch_one(&state.db)
             .await
             .unwrap();
-        info!("Picker download count: {}", picker.download_count);
+        // info!("Picker download count: {}", picker.download_count);
         assert_eq!(picker.download_count, 0);
     }
 
@@ -751,10 +1162,12 @@ mod tests {
         info!("Creating test users and picker...");
 
         // 创建测试用户
+        // 创建测试用户
+        // info!("Creating test user...");
         let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -768,8 +1181,8 @@ mod tests {
         // 创建测试开发者用户
         let result = sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -821,15 +1234,15 @@ mod tests {
         info!("Calling get_order_detail...");
 
         let result = get_order_detail(
-            State(state),
+            State(state.clone()),
             Extension(user_id),
             Path(order_id),
         ).await;
+        
+        info!("get_order_detail result: {:?}", result);
 
-        info!("Get order detail result: {:?}", result);
-    
         assert!(result.is_ok());
-    
+
         let response = result.unwrap();
         assert_eq!(response.order_id, order_id);
         assert_eq!(response.user_id, user_id);
@@ -837,7 +1250,7 @@ mod tests {
         assert_eq!(response.picker_alias, "Test Picker");
         assert_eq!(response.amount, 500);
         assert_eq!(response.pay_type, PayType::Premium);
-        assert_eq!(response.status, OrderStatus::Success, "Expected status to be success, but got {:?}", response.status);
+        assert_eq!(response.status, OrderStatus::Success);
     }
 
     #[tokio::test]
@@ -845,20 +1258,7 @@ mod tests {
     async fn test_get_order_detail_not_found() {
         let state = create_test_app_state().await;
         let user_id = Uuid::new_v4();
-        let order_id = Uuid::new_v4(); // 不存在的订单
-
-        // 创建测试用户
-        sqlx::query(
-            r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-        VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
-            "#,
-        )
-        .bind(user_id)
-        .bind(Utc::now().to_rfc3339())
-        .execute(&state.db)
-        .await
-        .unwrap();
+        let order_id = Uuid::new_v4();
 
         let result = get_order_detail(
             State(state),
@@ -881,41 +1281,35 @@ mod tests {
         let dev_user_id = Uuid::new_v4();
         let picker_id = Uuid::new_v4();
         let order_id = Uuid::new_v4();
-    
+
         // 创建测试用户
-        let result = sqlx::query(
+        sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, ?, 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
-        .bind("user@test.com")
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await;
-        
-        info!("Insert user result: {:?}", result);
-        result.unwrap();
-    
+        .await
+        .unwrap();
+
         // 创建测试开发者用户
-        let result = sqlx::query(
+        sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, ?, 'Dev User', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
             "#,
         )
         .bind(dev_user_id)
-        .bind("dev@test.com")
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await;
-        
-        info!("Insert dev user result: {:?}", result);
-        result.unwrap();
-    
+        .await
+        .unwrap();
+
         // 创建测试Picker
-        let result = sqlx::query(
+        sqlx::query(
             r#"
             INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
             VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
@@ -926,13 +1320,11 @@ mod tests {
         .bind(Utc::now().to_rfc3339())
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await;
-        
-        info!("Insert picker result: {:?}", result);
-        result.unwrap();
-    
+        .await
+        .unwrap();
+
         // 创建测试订单
-        let result = sqlx::query(
+        sqlx::query(
             r#"
             INSERT INTO orders (order_id, user_id, picker_id, amount, pay_type, status, tx_hash, created_at, expires_at)
             VALUES (?, ?, ?, 500, ?, ?, NULL, ?, NULL)
@@ -945,23 +1337,17 @@ mod tests {
         .bind(&OrderStatus::Success)
         .bind(Utc::now().to_rfc3339())
         .execute(&state.db)
-        .await;
-        
-        info!("Insert order result: {:?}", result);
-        result.unwrap();
-    
-        info!("Calling get_order_detail...");
-    
+        .await
+        .unwrap();
+
         let result = get_order_detail(
             State(state),
             Extension(user_id),
             Path(order_id),
         ).await;
-    
-        info!("Get order detail result: {:?}", result);
-    
+
         assert!(result.is_ok());
-    
+
         let response = result.unwrap();
         assert_eq!(response.order_id, order_id);
         assert_eq!(response.user_id, user_id);
@@ -970,5 +1356,431 @@ mod tests {
         assert_eq!(response.amount, 500);
         assert_eq!(response.pay_type, PayType::Premium);
         assert_eq!(response.status, OrderStatus::Success);
+    }
+
+    // 新增测试用例：测试用户不存在
+    #[tokio::test]
+    #[serial]
+    async fn test_create_order_user_not_found() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+        let dev_user_id = Uuid::new_v4();
+
+        // 创建测试开发者用户和Picker，但不创建用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        let request = CreateOrderRequest {
+            picker_id,
+            pay_type: PayType::Premium,
+        };
+
+        let result = create_order(
+            State(state),
+            Extension(user_id),
+            Json(request),
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::NotFound(msg) => assert_eq!(msg, "User not found"),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    // 新增测试用例：测试Picker不活跃
+    #[tokio::test]
+    #[serial]
+    async fn test_create_order_inactive_picker() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let dev_user_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+
+        // 创建测试用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            "#,
+        )
+        .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建非活跃的测试Picker
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'inactive', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        let request = CreateOrderRequest {
+            picker_id,
+            pay_type: PayType::Premium,
+        };
+
+        let result = create_order(
+            State(state),
+            Extension(user_id),
+            Json(request),
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::NotFound(msg) => assert_eq!(msg, "Picker not found"),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    // 新增测试用例：测试获取用户订单列表空结果
+    #[tokio::test]
+    #[serial]
+    async fn test_get_user_orders_empty() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+
+        let query = OrderQuery {
+            page: Some(1),
+            size: Some(10),
+            status: None,
+        };
+
+        let result = get_user_orders(
+            State(state),
+            Extension(user_id),
+            Query(query),
+        ).await;
+
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.orders.len(), 0);
+        assert_eq!(response.total, 0);
+        assert_eq!(response.page, 1);
+        assert_eq!(response.size, 10);
+        assert_eq!(response.has_next, false);
+    }
+
+    // 新增测试用例：测试获取用户订单列表按状态筛选
+    #[tokio::test]
+    #[serial]
+    async fn test_get_user_orders_by_status() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let dev_user_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+        let order_id = Uuid::new_v4();
+
+        // 创建测试用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            "#,
+        )
+        .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试Picker
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试订单
+        sqlx::query(
+            r#"
+            INSERT INTO orders (order_id, user_id, picker_id, amount, pay_type, status, tx_hash, created_at, expires_at)
+            VALUES (?, ?, ?, 500, ?, ?, NULL, ?, NULL)
+            "#,
+        )
+        .bind(order_id)
+        .bind(user_id)
+        .bind(picker_id)
+        .bind(&PayType::Premium)
+        .bind(&OrderStatus::Success)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        let query = OrderQuery {
+            page: Some(1),
+            size: Some(10),
+            status: Some(OrderStatus::Success),
+        };
+
+        let result = get_user_orders(
+            State(state),
+            Extension(user_id),
+            Query(query),
+        ).await;
+        
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.orders.len(), 1);
+        assert_eq!(response.total, 1);
+        assert_eq!(response.orders[0].status, OrderStatus::Success);
+    }
+
+    // 新增测试用例：测试获取订单详情订单不存在
+    #[tokio::test]
+    #[serial]
+    async fn test_get_order_detail_order_not_found() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let order_id = Uuid::new_v4();
+
+        let result = get_order_detail(
+            State(state),
+            Extension(user_id),
+            Path(order_id),
+        ).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            AppError::NotFound(msg) => assert_eq!(msg, "Order not found"),
+            _ => panic!("Expected NotFound error"),
+        }
+    }
+
+    // 新增测试用例：测试获取订单详情但Picker不存在
+    #[tokio::test]
+    #[serial]
+    async fn test_get_order_detail_picker_not_found() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let dev_user_id = Uuid::new_v4();
+        let order_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+
+        // 创建测试用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            "#,
+        )
+        .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', 'devwallet456', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试Picker
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建订单
+        sqlx::query(
+            r#"
+            INSERT INTO orders (order_id, user_id, picker_id, amount, pay_type, status, tx_hash, created_at, expires_at)
+            VALUES (?, ?, ?, 500, ?, ?, NULL, ?, NULL)
+            "#,
+        )
+        .bind(order_id)
+        .bind(user_id)
+        .bind(picker_id)
+        .bind(&PayType::Premium)
+        .bind(&OrderStatus::Success)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 删除Picker以模拟Picker不存在的情况
+        sqlx::query("DELETE FROM pickers WHERE picker_id = ?")
+            .bind(picker_id)
+            .execute(&state.db)
+            .await
+            .unwrap();
+
+        let result = get_order_detail(
+            State(state),
+            Extension(user_id),
+            Path(order_id),
+        ).await;
+
+        assert!(result.is_err());
+    }
+
+    // 新增测试用例：测试使用钱包支付创建订单
+    #[tokio::test]
+    #[serial]
+    async fn test_create_order_wallet_payment() {
+        let state = create_test_app_state().await;
+        let user_id = Uuid::new_v4();
+        let dev_user_id = Uuid::new_v4();
+        let picker_id = Uuid::new_v4();
+        
+        // 创建测试用户，钱包余额足够支付
+        // 修复用户类型，使其符合数据库约束('gen'或'dev')
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', '0x1234567890123456789012345678901234567890', 1000, ?)
+            "#,
+        )
+        .bind(user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试开发者用户
+        sqlx::query(
+            r#"
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_456', '0xabcdef1234567890abcdef1234567890abcdef12', 0, ?)
+            "#,
+        )
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试Picker
+        sqlx::query(
+            r#"
+            INSERT INTO pickers (picker_id, dev_user_id, alias, description, price, image_path, file_path, version, status, download_count, created_at, updated_at)
+            VALUES (?, ?, 'Test Picker', 'Test Description', 500, 'test.jpg', 'test.exe', '1.0', 'active', 0, ?, ?)
+            "#,
+        )
+        .bind(picker_id)
+        .bind(dev_user_id)
+        .bind(Utc::now().to_rfc3339())
+        .bind(Utc::now().to_rfc3339())
+        .execute(&state.db)
+        .await
+        .unwrap();
+
+        // 创建测试路由
+        use axum::Router;
+        use axum::http::{Request, StatusCode};
+        use tower::ServiceExt;
+        
+        let app = Router::new()
+            .route("/api/orders", axum::routing::post(create_order))
+            .layer(axum::middleware::from_fn_with_state(state.clone(), move |State(_state): State<AppState>, mut request: axum::http::Request<axum::body::Body>, next: axum::middleware::Next| async move {
+                request.extensions_mut().insert(user_id);
+                next.run(request).await
+            }))
+            .with_state(state.clone());
+
+        // 创建请求体
+        let body = serde_json::json!({
+            "picker_id": picker_id,
+            "pay_type": "wallet"
+        });
+
+        let request = Request::builder()
+            .method("POST")
+            .uri("/api/orders")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(serde_json::to_string(&body).unwrap()))
+            .unwrap();
+
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        
     }
 }

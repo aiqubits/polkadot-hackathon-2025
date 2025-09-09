@@ -22,12 +22,14 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
         .await?;
 
     // 创建用户表
+    // user_password 加密存储使用的 salt 是 user_id<UUID>字符串与"openpick"字符串的组合，这样使得每个用户的密码都有独立的加密salt，密码存储更加安全
     sqlx::query(
         r#"
         CREATE TABLE IF NOT EXISTS users (
             user_id BLOB PRIMARY KEY,
             email TEXT UNIQUE NOT NULL,
             user_name TEXT NOT NULL,
+            user_password TEXT NOT NULL,
             user_type TEXT NOT NULL CHECK (user_type IN ('gen', 'dev')),
             private_key TEXT NOT NULL,
             wallet_address TEXT NOT NULL,
@@ -131,7 +133,7 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
             
             // 首先插入用户和picker
             sqlx::query(
-                "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'gen', 'key', 'addr', datetime('now'))"
+                "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
             )
             .bind(user_id)
             .execute(&pool)
@@ -200,7 +202,7 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
         
         // 首先插入用户和picker
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .bind(user_id)
         .execute(&pool)
@@ -253,7 +255,7 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
         
         // 首先插入用户和picker
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) VALUES (?, 'test@test.com', 'Test User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .bind(user_id)
         .execute(&pool)
@@ -398,7 +400,7 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 测试用户类型约束
         let result = sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
              VALUES ('test1', 'test@example.com', 'Test User', 'invalid_type', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
@@ -415,16 +417,16 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 测试有效的用户类型
         let result_gen = sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('test1', 'test1@example.com', 'Test User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('test1', 'test1@example.com', 'Test User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await;
         assert!(result_gen.is_ok(), "Should succeed with valid user_type 'gen'");
 
         let result_dev = sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('test2', 'test2@example.com', 'Test Dev', 'dev', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('test2', 'test2@example.com', 'Test Dev', 'hashed_password', 'dev', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await;
@@ -439,8 +441,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 插入第一个用户
         let result1 = sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('test1', 'duplicate@example.com', 'Test User 1', 'gen', 'key1', 'addr1', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('test1', 'duplicate@example.com', 'Test User 1', 'hashed_password', 'gen', 'key1', 'addr1', datetime('now'))"
         )
         .execute(&pool)
         .await;
@@ -448,8 +450,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 尝试插入相同邮箱的用户
         let result2 = sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('test2', 'duplicate@example.com', 'Test User 2', 'dev', 'key2', 'addr2', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('test2', 'duplicate@example.com', 'Test User 2', 'hashed_password', 'dev', 'key2', 'addr2', datetime('now'))"
         )
         .execute(&pool)
         .await;
@@ -464,8 +466,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 先插入一个用户
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('dev1', 'dev@example.com', 'Dev User', 'dev', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('dev1', 'dev@example.com', 'Dev User', 'hashed_password', 'dev', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
@@ -489,8 +491,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 先插入一个用户
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('dev1', 'dev@example.com', 'Dev User', 'dev', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('dev1', 'dev@example.com', 'Dev User', 'hashed_password', 'dev', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
@@ -537,8 +539,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 插入测试用户
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('user1', 'user@example.com', 'User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('user1', 'user@example.com', 'User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
@@ -575,16 +577,16 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 先插入测试数据
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('user1', 'user@example.com', 'User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('user1', 'user@example.com', 'User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
         .expect("Failed to insert test user");
 
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('dev1', 'dev@example.com', 'Dev', 'dev', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('dev1', 'dev@example.com', 'Dev', 'hashed_password', 'dev', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
@@ -627,16 +629,16 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 先插入测试数据
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('user1', 'user@example.com', 'User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('user1', 'user@example.com', 'User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
         .expect("Failed to insert test user");
 
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('dev1', 'dev@example.com', 'Dev', 'dev', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('dev1', 'dev@example.com', 'Dev', 'hashed_password', 'dev', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await
@@ -740,8 +742,8 @@ pub async fn init_database(pool: &DbPool) -> Result<(), sqlx::Error> {
 
         // 测试用户表的默认值
         sqlx::query(
-            "INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, created_at) 
-             VALUES ('test1', 'test@example.com', 'Test User', 'gen', 'key', 'addr', datetime('now'))"
+            "INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, created_at) 
+             VALUES ('test1', 'test@example.com', 'Test User', 'hashed_password', 'gen', 'key', 'addr', datetime('now'))"
         )
         .execute(&pool)
         .await

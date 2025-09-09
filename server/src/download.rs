@@ -5,34 +5,52 @@ use axum::{
     body::Body as AxumBody,
 };
 use serde::Deserialize;
+use utoipa::ToSchema;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use tracing::info;
 
 use crate::config::AppState;
-use crate::models::{Order, OrderStatus, PayType, Picker};
+use crate::models::{Order, OrderStatus, Picker};
 use crate::utils::AppError;
 
 // 下载请求的查询参数
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct DownloadQuery {
     pub token: String,
 }
 
 // 处理下载请求
+#[utoipa::path(
+    get,
+    path = "/download",
+    tag = "download",
+    summary = "下载Picker文件",
+    description = "使用下载令牌下载已购买的Picker文件",
+    params(
+        ("token" = String, Query, description = "下载令牌")
+    ),
+    responses(
+        (status = 200, description = "文件下载成功", content_type = "application/octet-stream"),
+        (status = 401, description = "令牌无效或已过期", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "订单、Picker或文件不存在", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+    )
+)]
 pub async fn download(
     State(state): State<AppState>,
     Query(query): Query<DownloadQuery>,
 ) -> Result<impl IntoResponse, AppError> {
+    info!("Download request received with token: {}", query.token);
     // 1. 验证token
     let token = query.token;
     let order_id = {
         let mut tokens = state.download_tokens.lock().map_err(|_| AppError::InternalServerError)?;
-        let download_token = tokens.remove(&token).ok_or(AppError::Unauthorized)?;
+        let download_token = tokens.remove(&token).ok_or(AppError::Unauthorized("无效的下载令牌".to_string()))?;
         
         // 2. 检查token是否过期
         if download_token.is_expired() {
-            return Err(AppError::Unauthorized);
+            return Err(AppError::Unauthorized("下载令牌已过期".to_string()));
         }
         
         download_token.order_id
@@ -106,14 +124,12 @@ pub async fn download(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_app_state;
-    use crate::models::{DownloadToken};
+    use crate::utils_tests::create_test_app_state;
+    use crate::models::{DownloadToken, PayType};
     use axum::extract::{Query, State};
     use chrono::{Duration, Utc};
     use serial_test::serial;
-    use std::sync::Arc;
     use uuid::Uuid;
-    use sqlx::Row;
 
     async fn create_test_file(path: &str, content: &[u8]) -> std::io::Result<()> {
         if let Some(parent) = std::path::Path::new(path).parent() {
@@ -139,8 +155,8 @@ mod tests {
         // 创建测试数据
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -151,8 +167,8 @@ mod tests {
 
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -209,7 +225,7 @@ mod tests {
             match e {
                 AppError::InternalServerError => info!("Internal server error occurred"),
                 AppError::NotFound(msg) => info!("Not found: {}", msg),
-                AppError::Unauthorized => info!("Unauthorized access"),
+                AppError::Unauthorized(_) => info!("Unauthorized access"),
                 _ => info!("Other error: {:?}", e),
             }
         }
@@ -247,7 +263,7 @@ mod tests {
             Ok(_) => panic!("Expected error, but got Ok"),
         };
         match err {
-            AppError::Unauthorized => {},
+            AppError::Unauthorized(_) => {},
             _ => panic!("Expected Unauthorized error"),
         }
     }
@@ -276,7 +292,7 @@ mod tests {
             Ok(_) => panic!("Expected error, but got Ok"),
         };
         match err {
-            AppError::Unauthorized => {},
+            AppError::Unauthorized(_) => {},
             _ => panic!("Expected Unauthorized error"),
         }
 
@@ -327,8 +343,8 @@ mod tests {
         // 创建测试数据
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -339,8 +355,8 @@ mod tests {
 
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -418,8 +434,8 @@ mod tests {
         // 创建测试用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -431,8 +447,8 @@ mod tests {
         // 创建开发者用户
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)
@@ -526,13 +542,12 @@ mod tests {
         let dev_user_id = Uuid::new_v4();
         let order_id = Uuid::new_v4();
         let token = "valid_token_123".to_string();
-        let file_path = "nonexistent_file.exe";
 
         // 创建测试数据
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'user@test.com', 'Test User', 'gen', 'private_key_123', 'wallet123', 1000, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'user@test.com', 'Test User', 'hashed_password', 'gen', 'private_key_123', 'wallet123', 1000, ?)
             "#,
         )
         .bind(user_id)
@@ -543,8 +558,8 @@ mod tests {
 
         sqlx::query(
             r#"
-            INSERT INTO users (user_id, email, user_name, user_type, private_key, wallet_address, premium_balance, created_at)
-            VALUES (?, 'dev@test.com', 'Dev User', 'dev', 'private_key_123', 'devwallet123', 0, ?)
+            INSERT INTO users (user_id, email, user_name, user_password, user_type, private_key, wallet_address, premium_balance, created_at)
+            VALUES (?, 'dev@test.com', 'Dev User', 'hashed_password', 'dev', 'private_key_123', 'devwallet123', 0, ?)
             "#,
         )
         .bind(dev_user_id)

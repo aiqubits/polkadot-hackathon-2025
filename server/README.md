@@ -142,7 +142,7 @@ cargo test
 
 # 测试覆盖率
 cargo install cargo-tarpaulin --version 0.32.8
-cargo tarpaulin --skip-clean --exclude-files "src/lib.rs,src/test_utils.rs" --output-dir "./coverage" --out Html
+cargo tarpaulin --skip-clean --exclude-files "src/main.rs" --output-dir "./coverage" --out Html -- --quiet
 ```
 
 ## 构建发布版本

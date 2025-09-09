@@ -1,19 +1,12 @@
 use crate::config::AppState;
 use crate::database::{create_pool, init_database};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 
 /// 创建测试用的应用状态
 pub async fn create_test_app_state() -> AppState {
     let pool = create_pool().await.expect("Failed to create test database pool");
     init_database(&pool).await.expect("Failed to initialize test database");
 
-    AppState {
-        db: pool,
-        jwt_secret: "test_secret_key_for_testing_purposes_only_do_not_use_in_production".to_string(),
-        verification_codes: Arc::new(Mutex::new(HashMap::new())),
-        download_tokens: Arc::new(Mutex::new(HashMap::new())),
-    }
+    AppState::new(pool)
 }
 
 /// 测试用的JWT密钥
@@ -78,7 +71,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_test_app_state() {
         let state = create_test_app_state().await;
-        assert_eq!(state.jwt_secret, TEST_JWT_SECRET);
+        assert!(!state.jwt_secret.is_empty());
         assert!(state.verification_codes.lock().unwrap().is_empty());
         assert!(state.download_tokens.lock().unwrap().is_empty());
     }
