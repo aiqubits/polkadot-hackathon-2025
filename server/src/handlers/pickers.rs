@@ -4,9 +4,9 @@ use axum::{
     Extension,
 };
 
-#[cfg(test)]
-use axum_test::TestServer;
-use chrono::Utc;
+// #[cfg(test)]
+// use axum_test::TestServer;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -52,13 +52,16 @@ pub struct MarketQuery {
 #[derive(Debug, Serialize, ToSchema)]
 pub struct PickerInfo {
     pub picker_id: Uuid,
+    pub dev_user_id: Uuid,
     pub alias: String,
     pub description: String,
     pub price: i64,
     pub image_path: String,
     pub version: String,
     pub download_count: i64,
-    pub created_at: chrono::DateTime<Utc>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub status: String,
 }
 
 // 市场响应
@@ -73,21 +76,21 @@ pub struct MarketResponse {
     post,
     path = "/api/pickers",
     tag = "pickers",
-    summary = "上传新的Picker",
-    description = "开发者上传新的Picker到市场",
+    summary = "Upload a new Picker",
+    description = "Developer uploads a new Picker to the market",
     security(
         ("bearer_auth" = [])
     ),
     request_body(
         content = UploadPickerRequest,
         content_type = "multipart/form-data",
-        description = "Picker文件和信息"
+        description = "Picker file and information"
     ),
     responses(
-        (status = 200, description = "上传成功", body = UploadPickerResponse),
-        (status = 400, description = "请求参数错误或非开发者用户", body = crate::openapi::ErrorResponse),
-        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Upload successful", body = UploadPickerResponse),
+        (status = 400, description = "Bad request, invalid parameters or non-developer user", body = crate::openapi::ErrorResponse),
+        (status = 401, description = "Unauthorized access", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn upload_picker(
@@ -205,16 +208,16 @@ pub async fn upload_picker(
     get,
     path = "/api/pickers",
     tag = "pickers",
-    summary = "获取Picker市场列表",
-    description = "获取可用的Picker列表，支持分页和搜索",
+    summary = "Get Picker Market List",
+    description = "Get a list of available pickers, supports pagination and search",
     params(
-        ("page" = Option<u32>, Query, description = "页码，默认为1"),
-        ("size" = Option<u32>, Query, description = "每页数量，默认为10"),
-        ("keyword" = Option<String>, Query, description = "搜索关键词")
+        ("page" = Option<u32>, Query, description = "Page number, default is 1"),
+        ("size" = Option<u32>, Query, description = "Number of items per page, default is 10"),
+        ("keyword" = Option<String>, Query, description = "Search keyword")
     ),
     responses(
-        (status = 200, description = "获取成功", body = MarketResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Get market list successfully", body = MarketResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn get_market(
@@ -278,13 +281,16 @@ pub async fn get_market(
 
     let picker_infos: Vec<PickerInfo> = pickers.into_iter().map(|p| PickerInfo {
         picker_id: p.picker_id,
+        dev_user_id: p.dev_user_id,
         alias: p.alias,
         description: p.description,
         price: p.price,
         image_path: p.image_path,
         version: p.version,
-        download_count: p.download_count as i64,
+        download_count: p.download_count,
         created_at: p.created_at,
+        updated_at: p.updated_at,
+        status: p.status,
     }).collect();
 
     Ok(Json(MarketResponse {
@@ -298,15 +304,15 @@ pub async fn get_market(
     get,
     path = "/api/pickers/{picker_id}",
     tag = "pickers",
-    summary = "获取Picker详情",
-    description = "根据ID获取特定Picker的详细信息",
+    summary = "Get Picker Details",
+    description = "Get details of a specific picker by its ID",
     params(
-        ("picker_id" = uuid::Uuid, Path, description = "Picker的唯一标识符")
+        ("picker_id" = uuid::Uuid, Path, description = "Picker's unique identifier")
     ),
     responses(
-        (status = 200, description = "获取成功", body = PickerInfo),
-        (status = 404, description = "Picker不存在", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Get picker details successfully", body = PickerInfo),
+        (status = 404, description = "Picker not found", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn get_picker_detail(
@@ -324,6 +330,7 @@ pub async fn get_picker_detail(
 
     Ok(Json(PickerInfo {
         picker_id: picker.picker_id,
+        dev_user_id: picker.dev_user_id,
         alias: picker.alias,
         description: picker.description,
         price: picker.price,
@@ -331,6 +338,8 @@ pub async fn get_picker_detail(
         version: picker.version,
         download_count: picker.download_count as i64,
         created_at: picker.created_at,
+        updated_at: picker.updated_at,
+        status: picker.status,
     }))
 }
 

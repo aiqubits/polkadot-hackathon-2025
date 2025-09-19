@@ -1,85 +1,8 @@
 // API Service
 // 提供与 Tauri 后端通信的接口
 import { invoke } from '@tauri-apps/api/core';
+import type { ResponseUserInfo, RegisterResponse, UserInfo, PickerListResponse, CreateOrderResponse, OrderStatus, OrderListResponse, OrderInfo } from '../types';
 // import type { message } from '@tauri-apps/plugin-dialog';
-
-// 定义API响应的类型
-export interface UserInfo {
-  user_id: string
-  email: string
-  user_name: string
-  user_type: string
-  wallet_address: string
-  premium_balance: number
-  created_at: string
-}
-
-export interface ResponseUserInfo {
-  chain_name: string,
-  premium_free: number,
-  premium_payment_rate: number,
-  premium_toUsd: number,
-  premium_period: number,
-  premium_start: boolean,
-  wallet_balance: number,
-  user_info: UserInfo
-}
-
-interface RegisterResponse {
-  user_id: string
-  message: string
-}
-
-interface PickerInfo {
-  pickerId: string
-  alias: string
-  description: string
-  price: number
-  imagePath: string
-  version: string
-  downloadCount: number
-  createdAt: string
-}
-
-interface PickerListResponse {
-  pickers: PickerInfo[]
-  total: number
-}
-
-interface CreateOrderResponse {
-  order_id: string
-  message: string
-}
-
-interface PayType {
-  Wallet: 'wallet'
-  Premium: 'premium'
-}
-
-interface OrderStatus {
-  Pending: 'pending'
-  Success: 'success'
-  Expired: 'expired'
-}
-
-interface OrderInfo {
-  orderId: string
-  userId: string
-  pickerId: string
-  pickerAlias: string
-  amount: number
-  payType: PayType
-  status: OrderStatus
-  createdAt: string
-}
-
-interface OrderListResponse {
-  orders: OrderInfo[]
-  total: number
-  page: number
-  size: number
-  has_next: boolean
-}
 
 // 模拟延迟
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -165,7 +88,6 @@ const localPickersDatabase = [
     description: 'ETL tool. Transform, validate and load data with ease.',
     category: 'Tools' as const,
     developer: 'DataTeam Inc.',
-    isPremium: true,
     rating: { score: 4.5, count: 128 },
     installs: 3450,
     actionText: 'Get'
@@ -176,7 +98,6 @@ const localPickersDatabase = [
     description: 'Real-time server monitoring with alerts and detailed performance metrics.',
     category: 'Popular' as const,
     developer: 'ServerPro Systems',
-    isPremium: false,
     rating: { score: 4.8, count: 312 },
     installs: 8250,
     actionText: 'Get'
@@ -187,7 +108,6 @@ const localPickersDatabase = [
     description: 'Simplify API integrations with built-in connectors and templates for popular services.',
     category: 'Tools' as const,
     developer: 'DevToolkit Labs',
-    isPremium: true,
     rating: { score: 4.2, count: 89 },
     installs: 1875,
     actionText: 'Get'
@@ -198,7 +118,6 @@ const localPickersDatabase = [
     description: 'Automated backup solution with encryption, versioning, and easy restore functionality.',
     category: 'New' as const,
     developer: 'SecureData Systems',
-    isPremium: false,
     rating: { score: 4.7, count: 56 },
     installs: 2140,
     actionText: 'Get'
@@ -209,7 +128,7 @@ const localPickersDatabase = [
     description: 'Convert between document formats with high-quality output and batch processing capabilities.',
     category: 'Tools' as const,
     developer: 'FileTools Inc.',
-    isPremium: true,
+
     rating: { score: 4.3, count: 147 },
     installs: 4320,
     actionText: 'Get'
@@ -220,7 +139,6 @@ const localPickersDatabase = [
     description: 'AI-powered assistant for task automation, data analysis and intelligent recommendations.',
     category: 'Premium' as const,
     developer: 'Alnova Tech',
-    isPremium: true,
     rating: { score: 4.6, count: 203 },
     installs: 6790,
     actionText: 'Get'
@@ -333,16 +251,16 @@ class APIService {
     await delay(200)
     try {
       // 调用 Tauri 后端的 login 命令
-      const response = await invoke<ResponseUserInfo>('login', {
+      const responseUserInfo = await invoke<ResponseUserInfo>('login', {
         email, // 假设的测试邮箱
         userPassword // 假设的测试密码
       });
 
-      if (!response) {
+      if (!responseUserInfo) {
         throw new Error('User not found.')
       }
 
-      return response;
+      return responseUserInfo;
 
     } catch (error) {
       // throw new Error(error instanceof Error ? error.message : 'Please try again.');
@@ -356,12 +274,26 @@ class APIService {
   async logout(): Promise<unknown> {
     try {
       // 调用 Tauri 后端的 logout 命令
-      await invoke('logout');
+      const message = await invoke('logout');
       
-      return { status: 'Logout successful.' };
+      return message;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Logout failed.') : 
+        (typeof error === 'string' ? error : JSON.stringify(error) || 'Please try again.');
+      throw new Error(errorMessage);
+    }
+  }
+
+  // 检查登录状态
+  async checkLoginStatus(): Promise<boolean> {
+    try {
+      // 调用 Tauri 后端的 check_login_status 命令
+      const isLoggedIn = await invoke<boolean>('check_login_status');
+      return isLoggedIn;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? 
+        (error.message || 'Check login status failed.') : 
         (typeof error === 'string' ? error : JSON.stringify(error) || 'Please try again.');
       throw new Error(errorMessage);
     }
@@ -379,13 +311,13 @@ class APIService {
         userType
       });
 
-      // 转换响应格式以保持与原有接口兼容
-      const registerData = {
-        user_id: response.user_id,
-        message: response.message,
-      };
+      // // 转换响应格式以保持与原有接口兼容
+      // const registerData = {
+      //   user_id: response.user_id,
+      //   message: response.message,
+      // };
       
-      return { id: registerData.user_id, message: registerData.message };
+      return response.message;
     } catch (error) {
       // throw new Error(error instanceof Error ? error.message : 'Please try again.');
       const errorMessage = error instanceof Error ? 
@@ -405,7 +337,7 @@ class APIService {
         code
       });
       
-      return { success: true, message: 'Email verified successfully' };
+      return 'Email verified successfully!';
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Email verification failed.') : 
@@ -437,7 +369,7 @@ class APIService {
         created_at: response.created_at
       };
       
-      return { success: true, user: userData };
+      return userData;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Get user profile failed.') : 
@@ -451,13 +383,13 @@ class APIService {
 
     try {
       // 调用 Tauri 后端的 get_current_user_info 命令
-      const response = await invoke<ResponseUserInfo>('get_current_user_info');
+      const responseUserInfo = await invoke<ResponseUserInfo>('get_current_user_info');
 
-      if (!response) {
+      if (!responseUserInfo) {
         throw new Error('User not found')
       }
 
-      return response ;
+      return responseUserInfo
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Get current user info failed.') : 
@@ -540,7 +472,7 @@ class APIService {
       throw new Error('Picker not found')
     }
     
-    return { picker }
+    return picker;
   }
 
   // 创建本地 Picker
@@ -559,7 +491,7 @@ class APIService {
     
     localTasksDatabase.push(newTask)
     
-    return { success: true, task: newTask }
+    return newTask
   }
 
   // Picker安装之后，运行时为任务
@@ -580,7 +512,7 @@ class APIService {
       task.runs += 1
     }
     
-    return { success: true, task }
+    return 'Task status updated successfully';
   }
 
   // 上传本地 Picker，仅 Dev权限
@@ -598,7 +530,7 @@ class APIService {
         image: image ? await image.arrayBuffer() : undefined,
       });
 
-      return { success: true, message: "Upload Picker success." };
+      return 'Upload Picker success.';
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Upload Picker failed.') : 
@@ -607,29 +539,23 @@ class APIService {
     }
   }
 
-  // 市场相关接口
-  async getPickerMarketplace(page?: string, size?: string, keyword?: string): Promise<unknown> {
+  // 市场 Pickers 相关接口
+  async getPickerMarketplace(page?: string, size?: string, keyword?: string): Promise<PickerListResponse> {
     await delay(500)
     
     try {
       // 调用 Tauri 后端的 get_picker_marketplace 命令
-      const response = await invoke<PickerListResponse>('get_picker_marketplace', {
+      const pickerListResponse = await invoke<PickerListResponse>('get_picker_marketplace', {
         page,
         size,
         keyword,
       });
 
-      if (!response) {
+      if (!pickerListResponse) {
         throw new Error('Picker list not found')
       }
-      
-      // 转换响应格式以保持与原有接口兼容
-      const pickerMarketplaceData = {
-        pickers: response.pickers,
-        total: response.total,
-      };
 
-      return { success: true, pickers: pickerMarketplaceData };
+      return pickerListResponse
     } catch (error) {
       // throw new Error(error instanceof Error ? error.message : 'Please try again.');
       const errorMessage = error instanceof Error ? 
@@ -649,10 +575,10 @@ class APIService {
       });
 
       if (!response) {
-        throw new Error('Picker list not found')
+        throw new Error('Picker not found')
       }
 
-      return { success: true, pickerDetail: response };
+      return response
     } catch (error) {
       // throw new Error(error instanceof Error ? error.message : 'Please try again.');
       const errorMessage = error instanceof Error ? 
@@ -662,22 +588,22 @@ class APIService {
     }
   }
 
-  // 订单相关的接口
-  async createOrder(pickerId: string, payType: string): Promise<unknown> {
+  // Picker 订单相关的接口
+  async createOrder(pickerid: string, paytype: string): Promise<string> {
     await delay(800)
 
     try {
       // 调用 Tauri 后端的 create_order 命令
-      const response = await invoke<CreateOrderResponse>('create_order', {
-        picker_id: pickerId,
-        pay_type: payType,
+      const createOrderResponse = await invoke<CreateOrderResponse>('create_order', {
+        pickerId: pickerid,
+        payType: paytype,
       });
 
-      if (!response) {
+      if (!createOrderResponse || !createOrderResponse.token) {
         throw new Error('Create Order failed.')
       }
-
-      return { success: true, message: response.message };
+      // "Order created successfully, Never close the client and wait for execution to complete!"
+      return createOrderResponse.token;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Create Order failed.') : 
@@ -691,23 +617,17 @@ class APIService {
     
     try {
       // 调用 Tauri 后端的 get_user_orders 命令
-      const response = await invoke<OrderListResponse>('get_user_orders', {
+      const userOrderList = await invoke<OrderListResponse>('get_user_orders', {
         page,
         size,
         status,
       });
 
-      if (!response) {
+      if (!userOrderList) {
         throw new Error('Get User Order failed.')
       }
 
-      // 依据前端实际需求，进行调整 todo!
-      const userOrderList = {
-        orders: response.orders,
-        total: response.total,
-      }
-
-      return { success: true, userOrderList: userOrderList };
+      return userOrderList;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Create Order List failed.') : 
@@ -721,20 +641,15 @@ class APIService {
     
     try {
       // 调用 Tauri 后端的 get_order_detail 命令
-      const response = await invoke<OrderInfo>('get_order_detail', {
+      const orderDetail = await invoke<OrderInfo>('get_order_detail', {
         order_id: orderId,
       });
 
-      if (!response) {
+      if (!orderDetail) {
         throw new Error('Get User Order Detail failed.')
       }
 
-      // 依据前端实际需求，进行调整 todo!
-      const orderDetail = {
-        order: response,
-      }
-
-      return { success: true, orderDetail: orderDetail };
+      return orderDetail;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Get Order Detail failed.') : 
@@ -743,19 +658,19 @@ class APIService {
     }
   }
 
-  async downloadFile(token: string): Promise<unknown> {
-    await delay(800)
+  async downloadFile(token: string): Promise<string> {
+    await delay(100)
     try {
       // 调用 Tauri 后端的 download_picker 命令
-      const response = await invoke<string>('download_picker', {
+      const fileLocalPath = await invoke<string>('download_picker', {
         token: token,
       });
 
-      if (!response) {
+      if (!fileLocalPath) {
         throw new Error('Download Picker failed.')
       }
 
-      return { success: true, filePath: response }
+      return fileLocalPath;
     } catch (error) {
       const errorMessage = error instanceof Error ? 
         (error.message || 'Download Picker failed.') : 
@@ -832,18 +747,7 @@ class APIService {
 //       uploadTime: new Date().toISOString()
 //     }
 //   }
-  
-//   // 下载相关接口
-//   async downloadFile(fileId: string): Promise<unknown> {
-//     await delay(1500)
-    
-//     return {
-//       success: true,
-//       downloadUrl: `/downloads/${fileId}`,
-//       fileName: `file_${fileId}.zip`,
-//       fileSize: 1024 * 1024 * 5 // 5MB
-//     }
-//   }
+
 }
 
 // 导出单例实例

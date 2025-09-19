@@ -4,6 +4,7 @@ use crate::api::client::{ApiClient, ApiError};
 use crate::api::models::{ConnectionStatus, SystemInfo, LoginRequest, LoginResponse, ResponseUserInfo, RegisterRequest, RegisterResponse, UserInfo, VerifyRequest, VerifyResponse};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
+use alloy::sol_types::sol_data::Bool;
 use serde_json::to_string;
 use tauri::State;
 use crate::api::models::UserType;
@@ -228,9 +229,9 @@ pub async fn get_user_profile(
 #[tauri::command]
 pub async fn logout(
     auth_manager: State<'_, AuthManager>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     auth_manager.clear_token().map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(true)
 }
 
 // 检查登录状态命令

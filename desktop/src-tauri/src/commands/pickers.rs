@@ -1,7 +1,7 @@
 // Picker 相关命令
 
 use crate::api::client::ApiClient;
-use crate::api::models::{ApiError, PickerInfo, PickerListResponse, UploadPickerRequest};
+use crate::api::models::{ApiError, PickerInfo, PickerListResponse, UploadPickerRequest, UploadPickerResponse};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
 use std::collections::HashMap;
@@ -69,8 +69,6 @@ pub async fn get_picker_detail(
     let path = format!("/api/pickers/{}", picker_id);
     println!("Making API request to path: {}", path);
     
-    //     match api_client.get::<String>("/", None).await {
-    //    Ok(response) => {
     // 使用更详细的错误处理
     match api_client.get(&path, None).await {
         Ok(response) => {
@@ -102,12 +100,12 @@ pub async fn upload_picker(
     file: Vec<u8>,
     image: Option<Vec<u8>>,
     auth_manager: State<'_, AuthManager>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let config = AppConfig::load().unwrap_or_else(|_| AppConfig::default());
     let api_client = ApiClient::new(&config, Some(auth_manager.inner().clone()));
     
-    // 调用文件上传方法
-    api_client.upload_file(
+    // 调用文件上传方法    
+    let upload_response: UploadPickerResponse = api_client.upload_file(
         "/api/pickers",
         &alias,
         &description,
@@ -117,5 +115,5 @@ pub async fn upload_picker(
         image.as_deref()
     ).await.map_err(|e| e.to_string())?;
     
-    Ok(())
+    Ok(upload_response.message)
 }

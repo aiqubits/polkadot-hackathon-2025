@@ -6,22 +6,22 @@ use thiserror::Error;
 // 错误类型定义
 #[derive(Debug, Error)]
 pub enum ApiError {
-    #[error("网络错误: {0}")]
+    #[error("Network error: {0}")]
     NetworkError(#[from] reqwest::Error),
     
-    #[error("服务器错误: {0}")]
+    #[error("Server error: {0}")]
     ServerError(String),
     
-    #[error("认证错误: {0}")]
+    #[error("Auth error: {0}")]
     AuthError(String),
     
-    #[error("请求参数错误: {0}")]
+    #[error("Validation error: {0}")]
     ValidationError(String),
     
-    #[error("未找到资源")]
+    #[error("Not found")]
     NotFound,
     
-    #[error("未知错误")]
+    #[error("Unknown error")]
     Unknown,
 }
 
@@ -129,6 +129,7 @@ pub struct RegisterResponse {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PickerInfo {
     pub picker_id: String,
+    pub dev_user_id: String,
     pub alias: String,
     pub description: String,
     pub price: i64,
@@ -136,6 +137,8 @@ pub struct PickerInfo {
     pub version: String,
     pub download_count: i64,
     pub created_at: String,
+    pub updated_at: String,
+    pub status: String,
 }
 
 // Picker 列表响应
@@ -152,6 +155,12 @@ pub struct UploadPickerRequest {
     pub description: String,
     pub price: i64,
     pub version: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UploadPickerResponse {
+    pub picker_id: String,
+    pub message: String,
 }
 
 // 支付类型
@@ -204,7 +213,7 @@ pub struct CreateOrderRequest {
 // 创建订单响应
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateOrderResponse {
-    pub order_id: String,
+    pub token: String,
     pub message: String,
 }
 

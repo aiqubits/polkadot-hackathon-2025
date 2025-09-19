@@ -1,10 +1,11 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import MarketplaceContent from './components/MarketplaceContent'
 import ProfileContent from './components/ProfileContent'
 import ChatbotContent from './components/ChatbotContent'
 import LogStream from './components/LogStream'
-import { clientAPI, type ResponseUserInfo } from './client/api'
+import { clientAPI } from './client/api'
+import type { ResponseUserInfo } from './types'
 
 // 用户类型定义
 interface User {
@@ -89,7 +90,31 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
 
+  // 窗口关闭事件监听，用于清理Token
+  useEffect(() => {
+    const cleanupTokenOnClose = async () => {
+      try {
+        // 检查是否已登录
+        alert('Logging out123...')
+        const loggedIn = await clientAPI.checkLoginStatus()
+        if (loggedIn) {
+          // 静默调用logout清理Token，但不显示alert
+          alert('Logging out...')
+          await clientAPI.logout()
+        }
+      } catch (error) {
+        console.error('Failed to cleanup token on close:', error)
+      }
+    }
 
+    // 添加窗口关闭事件监听
+    window.addEventListener('beforeunload', cleanupTokenOnClose)
+
+    // 清理函数
+    return () => {
+      window.removeEventListener('beforeunload', cleanupTokenOnClose)
+    }
+  }, [])
 
   const filteredTasks = tasks.filter(task => {
     const matchesFilter = activeFilter === 'all' || task.status === activeFilter
@@ -102,10 +127,6 @@ function App() {
     try {
       const response: ResponseUserInfo = await clientAPI.login(email, password);
 
-      // const status = (userData as { userId: string }).userId
-      // const userData = (response as { response: LoginResponse })
-      alert(JSON.stringify(response, null, 2));
-      console.log('Login response:', response);
       setCurrentUser({
         id: response.user_info.user_id,
         username: response.user_info.user_name || "OpenPick",
@@ -137,10 +158,10 @@ function App() {
 
   const handleVerifyEmail = async (email: string, code: string) => {
     try {
-      await clientAPI.verifyEmail(email, code);
+      const message = await clientAPI.verifyEmail(email, code);
       
       setShowVerifyModal(false);
-      alert('Email verified successfully! Please login.');
+      alert(message);
       setShowLoginModal(true);
     } catch (error) {
       console.error('Verification error:', error);
@@ -150,13 +171,13 @@ function App() {
 
   const handleLogout = async () => {
     try {
-      await clientAPI.logout();
+      const message = await clientAPI.logout();
       
       // 清除用户登录状态
       setCurrentUser(null);
       setIsLoggedIn(false);
       setShowLogoutMenu(false);
-      alert('Logout successful');
+      alert(message);
     } catch (error) {
       console.error('Logout error:', error);
       alert('Logout failed. ' + (error instanceof Error ? error.message : 'Please try again.'));
@@ -511,7 +532,7 @@ function App() {
               <button className="modal-close" onClick={() => setShowVerifyModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              <p>A verification code has been sent to {verifyEmail}</p>
+              <p>A verification code has been sent to {verifyEmail}, Please verify and complete registration.</p>
               <div className="form-group">
                 <label htmlFor="verify-code">Verification Code</label>
                 <input

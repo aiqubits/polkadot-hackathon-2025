@@ -1,47 +1,69 @@
 import { useState, useEffect } from 'react'
-import ProductCard from './ProductCard'
-import type { Product, Category } from '../types'
+import PickerCard from './PickerCard'
+import type { PickerInfo, Category } from '../types'
 import { clientAPI } from '../client/api'
 import './MarketplaceContent.css'
 
 const MarketplaceContent = () => {
   const [activeCategory, setActiveCategory] = useState<Category>('All')
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [products, setProducts] = useState<Product[]>([])
+  const [pickers, setPickers] = useState<PickerInfo[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
 
   // 从API获取产品数据
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchPickers = async () => {
       try {
         setIsLoading(true)
         setError(null)
-        const productsData = await clientAPI.getPickerMarketplace
-        if (Array.isArray(productsData)) {
-          setProducts(productsData as Product[])
+        const pickerListResponse = await clientAPI.getPickerMarketplace()
+        // const pickersTotal = pickerListResponse.total
+        const pickersData = pickerListResponse.pickers
+
+        if (Array.isArray(pickersData)) {
+          setPickers(pickersData as PickerInfo[])
         } else {
-          setError('Invalid product data received. Please try again later.')
+          setError('Invalid picker data received. Please try again later.')
         }
       } catch (err) {
-        console.error('Failed to fetch products:', err)
-        setError('Failed to load products. Please try again later.')
+        console.error('Failed to fetch pickers:', err)
+        setError('Failed to load pickers. Please try again later.')
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchProducts()
+    fetchPickers()
   }, [])
 
-  const categories: Category[] = ['All', 'Popular', 'New', 'Premium']
+  const categories: Category[] = ['All', 'Popular', 'New']
 
-  const filteredProducts = products.filter(product => {
-    const matchesCategory = activeCategory === 'All' || product.category === activeCategory
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         product.description.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesCategory && matchesSearch
+  // 搜索过滤查找包含关键词的pickers
+  const filteredPickers = pickers.filter(picker => {
+    const matchesSearch = picker.alias.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                         picker.description.toLowerCase().includes(searchQuery.toLowerCase())
+    return matchesSearch
   })
+
+  // // 根据 PickerInfo 中的 download_count 与 created_at 来排序
+  // const sortedPickers = filteredPickers.sort((a, b) => {
+  //   if (a.download_count !== b.download_count) {
+  //     return b.download_count - a.download_count
+  //   }
+  //   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  // })
+
+  // 分开实现，先根据下载次数排序
+  const sortedPickersByDownloadCount = filteredPickers.sort((a, b) => {
+    return b.download_count - a.download_count
+  })
+
+  // 再根据创建时间排序
+  const sortedPickersByCreatedAt = filteredPickers.sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+
 
   return (
     <div className="marketplace-content">
@@ -73,23 +95,26 @@ const MarketplaceContent = () => {
         </div>
       </div>
 
-      {/* Product Grid */}
+      {/* Picker Grid */}
       {isLoading ? (
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading products...</p>
+          <p>Loading pickers...</p>
         </div>
       ) : error ? (
         <div className="error-container">
           <p>{error}</p>
           <button className="retry-button" onClick={() => window.location.reload()}>Retry</button>
         </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="no-products">No products found</div>
+      ) : filteredPickers.length === 0 ? (
+        <div className="no-pickers">No pickers found</div>
       ) : (
-        <div className="product-grid">
-          {filteredProducts.map(product => (
-            <ProductCard key={product.id} product={product} />
+        <div className="picker-grid">
+          {/* 根据activeCategory选择不同的数据源 */}
+          {(activeCategory === 'All' ? filteredPickers : 
+            activeCategory === 'Popular' ? sortedPickersByDownloadCount : 
+            sortedPickersByCreatedAt).map(picker => (
+            <PickerCard key={picker.picker_id} picker={picker} />
           ))}
         </div>
       )}

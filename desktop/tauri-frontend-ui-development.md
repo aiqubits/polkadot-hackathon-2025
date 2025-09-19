@@ -17,7 +17,7 @@ src/
 │   ├── ProfileContent.tsx        # 用户资料组件
 │   ├── ChatbotContent.tsx        # 聊天机器人组件
 │   ├── LogStream.tsx             # 日志流组件
-│   ├── ProductCard.tsx           # 产品卡片组件
+│   ├── PickerCard.tsx           # 选择器卡片组件
 │   └── *.css                     # 组件样式文件
 └── types/
     └── index.ts        # TypeScript 类型定义
@@ -35,22 +35,22 @@ App.tsx 是整个应用的入口点，负责：
 
 **关键模拟数据结构**：
 - `mockTasks`: 模拟任务数据数组
-- `mockProducts`: 模拟市场产品数据数组
+- `mockPickers`: 模拟市场选择器数据数组
 - `User` 接口: 用户数据结构定义
 - `Task` 接口: 任务数据结构定义
 
 ### 3.2 市场模块 (MarketplaceContent.tsx)
 
-市场模块负责展示可供用户浏览和获取的工具产品，包含：
-- 产品分类筛选功能
-- 产品搜索功能
-- 产品网格布局展示
+市场模块负责展示可供用户浏览和获取的工具选择器，包含：
+- 选择器分类筛选功能
+- 选择器搜索功能
+- 选择器网格布局展示
 - 分页控制
 
 **关键数据结构**：
-- `Product` 接口: 市场产品数据结构
-- `Category` 类型: 产品分类定义
-- `ProductRating` 接口: 产品评分数据结构
+- `Picker` 接口: 市场选择器数据结构
+- `Category` 类型: 选择器分类定义
+- `PickerRating` 接口: 选择器评分数据结构
 
 ### 3.3 用户资料模块 (ProfileContent.tsx)
 
@@ -110,24 +110,23 @@ const mockTasks: Task[] = [
 ]
 ```
 
-### 4.2 修改市场产品数据
+### 4.2 修改市场 Picker 产品数据
 
-市场产品数据位于 App.tsx 文件中的 `mockProducts` 数组：
+市场选择器数据位于 App.tsx 文件中的 `mockPickers` 数组：
 
 ```javascript
-const mockProducts: Product[] = [
+const mockPickers: Picker[] = [
   {
     id: '1',  // 唯一标识符
-    name: '数据处理工具',  // 产品名称
-    description: 'ETL工具。轻松转换、验证和加载数据。',  // 产品描述
-    category: 'Tools',  // 产品分类
+    name: '数据处理工具',  // 选择器名称
+    description: 'ETL工具。轻松转换、验证和加载数据。',  // 选择器描述
+    category: 'Tools',  // 选择器分类
     developer: 'DataTeam Inc.',  // 开发者名称
-    isPremium: true,  // 是否为付费产品
-    rating: { score: 4.5, count: 128 },  // 评分信息
+    rating: { score: 4.5, count: 128 },  // 选择器评分信息
     installs: 3450,  // 安装次数
     actionText: '获取'  // 操作按钮文本
   },
-  // 更多产品...
+  // 更多选择器...
 ]
 ```
 
@@ -263,7 +262,7 @@ const [logs] = useState<LogEntry[]>([
 - ProfileContent.css: 个人资料组件样式
 - ChatbotContent.css: 聊天机器人组件样式
 - LogStream.css: 日志流组件样式
-- ProductCard.css: 产品卡片组件样式
+- PickerCard.css: 选择器卡片组件样式
 
 ## 6. 类型定义扩展
 

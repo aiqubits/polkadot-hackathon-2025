@@ -44,21 +44,6 @@ async fn main() -> Result<(), AppError> {
         .merge(create_protected_routes(app_state.clone()))
         .with_state(app_state);
     
-    // // 打印API文档
-    // info!("API Documentation:");
-    // info!("- GET  /                     - Health check");
-    // info!("- POST /api/users/register   - Register new user");
-    // info!("- POST /api/users/verify     - Verify user registration");
-    // info!("- POST /api/users/login      - User login");
-    // info!("- GET  /api/pickers          - Get list of pickers");
-    // info!("- GET  /api/pickers/:id      - Get picker details");
-    // info!("- GET  /api/users/profile    - Get user profile (protected)");
-    // info!("- POST /api/pickers          - Upload new picker (protected)");
-    // info!("- POST /api/orders           - Create new order (protected)");
-    // info!("- GET  /api/orders           - Get user orders (protected)");
-    // info!("- GET  /api/orders/:id       - Get order details (protected)");
-    // info!("- GET  /api/download/:token  - Download picker (protected)");
-    
     // 启动服务器
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     info!("Server running on http://0.0.0.0:3000");

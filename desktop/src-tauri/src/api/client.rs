@@ -3,6 +3,7 @@
 pub use super::models::{ApiError};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
+use log::info;
 use reqwest::{Client as ReqwestClient, RequestBuilder, multipart::Form};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -160,8 +161,11 @@ impl ApiClient {
     }
     
     // 文件上传方法
-    pub async fn upload_file(&self, path: &str, alias: &str, description: &str, price: i64,
-                             version: &str, file_bytes: &[u8], image_bytes: Option<&[u8]>) -> Result<serde_json::Value, ApiError> {
+    pub async fn upload_file<U>(&self, path: &str, alias: &str, description: &str, price: i64,
+                             version: &str, file_bytes: &[u8], image_bytes: Option<&[u8]>) -> Result<U, ApiError> 
+    where
+        U: serde::de::DeserializeOwned,
+    {
         let url = format!("{}{}", self.base_url, path);
         
         // 对于multipart请求，我们不能使用try_clone，所以在重试时需要重新构建请求
@@ -203,7 +207,7 @@ impl ApiClient {
             match request_builder.send().await {
                 Ok(response) => {
                     if response.status().is_success() {
-                        match response.json::<serde_json::Value>().await {
+                        match response.json::<U>().await {
                             Ok(data) => return Ok(data),
                             Err(err) => return Err(ApiError::NetworkError(err.into())),
                         }
@@ -267,7 +271,7 @@ where
                                 }
                                 
                                 // 如果都失败，返回适当的错误
-                                return Err(ApiError::ValidationError("无法解析响应内容".to_string()));
+                                return Err(ApiError::ValidationError("Failed to parse response content".to_string()));
                             },
                             Err(text_err) => {
                                 println!("Failed to read response text: {}", text_err);
@@ -321,7 +325,7 @@ where
                             }
                             
                             // 如果都失败，返回适当的错误
-                            return Err(ApiError::ValidationError("无法解析响应内容1122".to_string()));
+                            return Err(ApiError::ValidationError("Failed to parse response content".to_string()));
                         },
                         Err(text_err) => {
                             println!("Failed to read response text: {}", text_err);
@@ -350,21 +354,18 @@ where
     
     async fn handle_error_response(response: reqwest::Response) -> ApiError {
         let status = response.status();
+        let url = response.url().clone();
         
+        let message = format!("Failed to handle error response: {}", response.text().await.unwrap());
+        info!("Failed to handle error response: {:?}-{}", message, url);
         if status == reqwest::StatusCode::UNAUTHORIZED {
-            return ApiError::AuthError("密码错误，请重新登录".to_string());
+            return ApiError::AuthError(message);
         } else if status == reqwest::StatusCode::NOT_FOUND {
             return ApiError::NotFound;
         } else if status.is_client_error() {
-            if let Ok(err_body) = response.text().await {
-                return ApiError::ValidationError(err_body);
-            }
-            return ApiError::ValidationError(format!("客户端错误: {}", status));
-        } else if status.is_server_error() {
-            if let Ok(err_body) = response.text().await {
-                return ApiError::ServerError(err_body);
-            }
-            return ApiError::ServerError(format!("服务器错误: {}", status));
+            return ApiError::ValidationError(message);
+        } else if status.is_server_error() {         
+            return ApiError::ServerError(message);
         }
         
         ApiError::Unknown
@@ -438,9 +439,9 @@ mod tests {
                 Ok(serde_json::from_str(&self.response_data).unwrap())
             } else {
                 match self.status_code {
-                    401 => Err(ApiError::AuthError("认证失败，请重新登录".to_string())),
+                    401 => Err(ApiError::AuthError("Failed to authenticate. Please check your credentials and try again.".to_string())),
                     404 => Err(ApiError::NotFound),
-                    500..=599 => Err(ApiError::ServerError("内部服务器错误".to_string())),
+                    500..=599 => Err(ApiError::ServerError("Internal server error".to_string())),
                     400 => Err(ApiError::ValidationError("Bad Request".to_string())),
                     _ => Err(ApiError::Unknown),
                 }
@@ -452,9 +453,9 @@ mod tests {
                 Ok(serde_json::from_str(&self.response_data).unwrap())
             } else {
                 match self.status_code {
-                    401 => Err(ApiError::AuthError("认证失败，请重新登录".to_string())),
+                    401 => Err(ApiError::AuthError("Failed to authenticate. Please check your credentials and try again.".to_string())),
                     404 => Err(ApiError::NotFound),
-                    500..=599 => Err(ApiError::ServerError("内部服务器错误".to_string())),
+                    500..=599 => Err(ApiError::ServerError("Internal server error".to_string())),
                     400 => Err(ApiError::ValidationError("Bad Request".to_string())),
                     _ => Err(ApiError::Unknown),
                 }
@@ -617,7 +618,7 @@ mod tests {
         
         assert!(result.is_err());
         match &result {
-            Err(ApiError::ServerError(msg)) => assert_eq!(msg, "内部服务器错误"),
+            Err(ApiError::ServerError(msg)) => assert_eq!(msg, "Internal server error"),
             _ => panic!("Expected ServerError but got {:?}", result),
         }
     }

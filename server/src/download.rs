@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 use tokio::fs::File;
 use tokio_util::io::ReaderStream;
 use tracing::info;
+use chrono::Utc;
 
 use crate::config::AppState;
 use crate::models::{Order, OrderStatus, Picker};
@@ -25,16 +26,16 @@ pub struct DownloadQuery {
     get,
     path = "/download",
     tag = "download",
-    summary = "下载Picker文件",
-    description = "使用下载令牌下载已购买的Picker文件",
+    summary = "Download Picker file",
+    description = "Download a purchased Picker file using a download token",
     params(
-        ("token" = String, Query, description = "下载令牌")
+        ("token" = String, Query, description = "Download token")
     ),
     responses(
-        (status = 200, description = "文件下载成功", content_type = "application/octet-stream"),
-        (status = 401, description = "令牌无效或已过期", body = crate::openapi::ErrorResponse),
-        (status = 404, description = "订单、Picker或文件不存在", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "File download successful", content_type = "application/octet-stream"),
+        (status = 401, description = "Token is invalid or expired", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "Order, Picker, or file not found", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn download(
@@ -46,16 +47,16 @@ pub async fn download(
     let token = query.token;
     let order_id = {
         let mut tokens = state.download_tokens.lock().map_err(|_| AppError::InternalServerError)?;
-        let download_token = tokens.remove(&token).ok_or(AppError::Unauthorized("无效的下载令牌".to_string()))?;
+        let download_token = tokens.remove(&token).ok_or(AppError::Unauthorized("Invalid download token".to_string()))?;
         
         // 2. 检查token是否过期
         if download_token.is_expired() {
-            return Err(AppError::Unauthorized("下载令牌已过期".to_string()));
+            return Err(AppError::Unauthorized("Download token is expired".to_string()));
         }
         
         download_token.order_id
     };
-    
+    info!("Download request for order ID: {}", order_id);
     // 3. 获取订单信息
     let order_result = sqlx::query_as("SELECT * FROM orders WHERE order_id = ?")
         .bind(order_id)
@@ -72,7 +73,7 @@ pub async fn download(
             return Err(e);
         },
     };
-    
+    info!("Download request for order ID: {}, picker ID: {}", order_id, order.picker_id);
     // 4. 检查订单状态
     if order.status != OrderStatus::Success {
         return Err(AppError::NotFound("Order not paid".to_string()));
@@ -94,6 +95,7 @@ pub async fn download(
             return Err(e);
         },
     };
+    info!("Download request for order ID: {}, picker ID: {}, file path: {}", order_id, order.picker_id, picker.file_path);
     
     // 6. 检查文件是否存在
     let file_path = &picker.file_path;
@@ -105,7 +107,7 @@ pub async fn download(
     let file = File::open(file_path).await.map_err(|_| AppError::InternalServerError)?;
     let stream = ReaderStream::new(file);
     let body = AxumBody::from_stream(stream);
-    
+    info!("Download request update times");
     // 8. 更新下载次数
     sqlx::query("UPDATE pickers SET download_count = download_count + 1 WHERE picker_id = ?")
         .bind(picker.picker_id)
@@ -116,7 +118,22 @@ pub async fn download(
     // 9. 设置响应头
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", "application/octet-stream".parse().unwrap());
-    headers.insert("Content-Disposition", "attachment; filename=\"picker.exe\"".parse().unwrap());
+    // 重新格式化文件名
+    let download_date = Utc::now().format("%Y-%m-%d");
+    // 从文件路径中提取文件名
+    let original_filename = picker.file_path.split('/').last().unwrap_or("picker.exe");
+    // 分离文件名和扩展名
+    let mut parts: Vec<&str> = original_filename.split('.').collect();
+    let extension = if parts.len() > 1 {
+        parts.pop().unwrap()
+    } else {
+        ""
+    };
+    let base_name = parts.join(".");
+    // 组合新文件名，加入下载日期
+    let filename = format!("{}_{}.{}", base_name, download_date, extension);
+    info!("Downloading file: {}", filename);
+    headers.insert("Content-Disposition", format!("attachment; filename=\"{}\"", filename).parse().unwrap());
     
     Ok((headers, body).into_response())
 }

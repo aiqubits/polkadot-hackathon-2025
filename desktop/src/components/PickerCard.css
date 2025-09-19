@@ -1,5 +1,8 @@
-/* Product Card Styles */
-.product-card {
+/* 引入基础对话框样式 */
+@import './BaseDialog.css';
+
+/* Picker Card Styles */
+.picker-card {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -10,21 +13,64 @@
   height: 100%;
 }
 
-.product-card:hover {
+/* Picker Info Container with Image */
+.picker-info-container {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+  margin-bottom: 16px;
+}
+
+.picker-info {
+  flex: 1;
+  margin-right: 16px;
+  min-width: 0; /* 确保文本内容不会溢出 */
+}
+
+.picker-image-container {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.picker-image {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+/* 响应式调整 */
+@media (max-width: 600px) {
+  .picker-image {
+    width: 60px;
+    height: 60px;
+  }
+}
+
+.picker-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.picker-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 16px var(--shadow);
   border-color: var(--accent-primary);
 }
 
 /* Card Header */
-.product-header {
+.picker-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
 }
 
-.product-category {
+.picker-category {
   font-size: 12px;
   font-weight: 500;
   color: var(--accent-primary);
@@ -33,32 +79,32 @@
   border-radius: 4px;
 }
 
-.product-menu {
+.picker-menu {
   padding: 4px;
   border-radius: 4px;
   color: var(--text-secondary);
   transition: all 0.2s ease;
 }
 
-.product-menu:hover {
+.picker-menu:hover {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-/* Product Info */
-.product-info {
+/* Picker Info */
+.picker-info {
   flex: 1;
   margin-bottom: 16px;
 }
 
-.product-name {
+.picker-name {
   font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 8px 0;
 }
 
-.product-description {
+.picker-description {
   font-size: 14px;
   color: var(--text-secondary);
   margin: 0 0 8px 0;
@@ -69,20 +115,20 @@
   -webkit-box-orient: vertical;
 }
 
-.product-developer {
+.picker-developer {
   font-size: 12px;
   color: var(--text-muted);
 }
 
-/* Product Details */
-.product-details {
+/* Picker Details */
+.picker-details {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.product-price {
+.picker-price {
   display: flex;
   align-items: center;
 }
@@ -105,7 +151,7 @@
   border-radius: 4px;
 }
 
-.product-rating {
+.picker-rating {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -131,7 +177,7 @@
 }
 
 /* Installation Info */
-.product-installs {
+.picker-installs {
   margin-bottom: 16px;
 }
 
@@ -161,4 +207,20 @@
 
 .action-button:active {
   transform: translateY(0);
+}
+
+/* Inactive Button Styles */
+.action-button.inactive {
+  background-color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.action-button.inactive:hover {
+  background-color: var(--text-muted);
+  transform: none;
+}
+
+.action-button.inactive:active {
+  transform: none;
 }

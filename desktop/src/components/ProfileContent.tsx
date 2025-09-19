@@ -64,8 +64,7 @@ const ProfileContent = () => {
       try {
         // 调用Tauri后端的get_current_user_info命令
         const response: ResponseUserInfo = await clientAPI.getCurrentUserInfo();
-        console.log('getCurrentUserInfo response: ', JSON.stringify(response));
-        console.log('getCurrentUserInfo user_type: ', response.user_info.user_type.toLowerCase());
+        
         if (response) {
           // 更新用户数据，将后端数据覆盖到模拟数据上
           setUserData(prev => ({

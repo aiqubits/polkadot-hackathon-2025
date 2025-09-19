@@ -24,10 +24,10 @@ use crate::middleware::auth_middleware;
     get,
     path = "/",
     tag = "health",
-    summary = "健康检查",
-    description = "检查服务器是否正常运行",
+    summary = "Health Check",
+    description = "Check if the server is running",
     responses(
-        (status = 200, description = "服务器正常运行", body = String, example = "Pickers Server is running!")
+        (status = 200, description = "Server is running", body = String, example = "Pickers Server is running!")
     )
 )]
 pub async fn health_check() -> &'static str {

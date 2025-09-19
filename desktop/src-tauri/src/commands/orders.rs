@@ -46,6 +46,8 @@ pub async fn create_order(
     pay_type: String,
     auth_manager: State<'_, AuthManager>,
 ) -> Result<CreateOrderResponse, String> {
+    println!("create_order: {:?}", &picker_id);
+    println!("create_order: {:?}", &pay_type);
     let config = AppConfig::load().unwrap_or_else(|_| AppConfig::default());
     let api_client = ApiClient::new(&config, Some(auth_manager.inner().clone()));
     

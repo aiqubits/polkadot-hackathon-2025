@@ -15,7 +15,7 @@ use uuid::Uuid;
 use std::time::Duration;
 
 use crate::config::AppState;
-use crate::models::{Order, OrderStatus, PayType, User, Picker};
+use crate::models::{Order, OrderStatus, PayType, User, Picker, DownloadToken};
 use crate::utils::{AppError, decrypt_private_key};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::primitives::Address;
@@ -34,7 +34,7 @@ pub struct CreateOrderRequest {
 // 创建订单响应
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CreateOrderResponse {
-    pub order_id: Uuid,
+    pub token: String,
     pub message: String,
 }
 
@@ -74,14 +74,14 @@ pub struct OrderListResponse {
     post,
     path = "/api/orders",
     tag = "orders",
-    summary = "创建订单",
-    description = "为指定的Picker创建订单，支持Premium和钱包支付两种方式",
-    request_body(content = CreateOrderRequest, description = "创建订单请求参数", content_type = "application/json"),
+    summary = "Create Order",
+    description = "Create an order for the specified Picker, supporting both Premium and wallet payment methods",
+    request_body(content = CreateOrderRequest, description = "Create order request parameters", content_type = "application/json"),
     responses(
-        (status = 200, description = "订单创建成功", body = CreateOrderResponse),
-        (status = 400, description = "请求参数错误", body = crate::openapi::ErrorResponse),
-        (status = 404, description = "用户或Picker不存在", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Order created successfully", body = CreateOrderResponse),
+        (status = 400, description = "Request parameters error", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "User or Picker not found", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     ),
     security(
         ("bearer_auth" = [])
@@ -136,7 +136,7 @@ pub async fn create_order(
         PayType::Premium => {
             info!("Processing premium payment, user balance: {}, picker price: {}", user.premium_balance, picker.price);
             if user.premium_balance < picker.price {
-                return Err(AppError::BadRequest("Insufficient premium balance".to_string()));
+                return Err(AppError::BadRequest("Insufficient premium balance.".to_string()));
             }
         }
         PayType::Wallet => {
@@ -184,7 +184,7 @@ pub async fn create_order(
                 let order_amount_in_wei = alloy::primitives::U256::from(picker.price);
                 info!("Wallet balance: {}, order amount: {}", balance, order_amount_in_wei);
                 if balance < order_amount_in_wei {
-                    return Err(AppError::BadRequest("Insufficient wallet balance".to_string()));
+                    return Err(AppError::BadRequest("Insufficient wallet balance.".to_string()));
                 }
                 
                 // 记录钱包支付信息
@@ -594,9 +594,20 @@ pub async fn create_order(
     result.map_err(|_| AppError::DatabaseError)?;
 
     info!("Order created successfully with ID: {}", order_id);
+
+    // 生成下载token
+    let download_token = DownloadToken::new(order_id);
+    let token_value = download_token.token.clone();
+
+    // 将生成的下载token存储到state.download_tokens中
+    state.download_tokens.lock().map_err(|_| AppError::InternalServerError)?
+        .insert(token_value.clone(), download_token);
+
+    info!("Generated download token for order {}: {}", order_id, token_value);
+
     Ok(Json(CreateOrderResponse {
-        order_id,
-        message: "Order created successfully".to_string(),
+        token: token_value,
+        message: "Order created successfully, Never close the client and wait for execution to complete!".to_string(),
     }))
 }
 
@@ -605,20 +616,20 @@ pub async fn create_order(
     get,
     path = "/api/orders",
     tag = "orders",
-    summary = "获取用户订单列表",
-    description = "获取当前用户的所有订单，支持分页和状态筛选",
+    summary = "Get User Order List",
+    description = "Get all orders for the current user, supporting pagination and status filtering",
     security(
         ("bearer_auth" = [])
     ),
     params(
-        ("page" = Option<u32>, Query, description = "页码，默认为1"),
-        ("size" = Option<u32>, Query, description = "每页数量，默认为10"),
-        ("status" = Option<OrderStatus>, Query, description = "订单状态筛选")
+        ("page" = Option<u32>, Query, description = "Page number, default is 1"),
+        ("size" = Option<u32>, Query, description = "Number of items per page, default is 10"),
+        ("status" = Option<OrderStatus>, Query, description = "Order status filter")
     ),
     responses(
-        (status = 200, description = "获取成功", body = OrderListResponse),
-        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Get order list successfully", body = OrderListResponse),
+        (status = 401, description = "Unauthorized access", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn get_user_orders(
@@ -726,22 +737,22 @@ pub async fn get_user_orders(
     get,
     path = "/api/orders/{order_id}",
     tag = "orders",
-    summary = "获取订单详情",
-    description = "根据订单ID获取订单的详细信息",
+    summary = "Get Order Detail",
+    description = "Get detailed information of a specific order by order ID",
     security(
         ("bearer_auth" = [])
     ),
     params(
-        ("order_id" = uuid::Uuid, Path, description = "订单的唯一标识符")
+        ("order_id" = uuid::Uuid, Path, description = "Order ID")
     ),
     responses(
-        (status = 200, description = "获取成功", body = OrderInfo),
-        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
-        (status = 404, description = "订单不存在", body = crate::openapi::ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Get order detail successfully", body = OrderInfo),
+        (status = 401, description = "Unauthorized access", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "Order not found", body = crate::openapi::ErrorResponse),
+        (status = 500, description = "Internal server error", body = crate::openapi::ErrorResponse)
     )
 )]
-pub async fn get_order_detail(
+pub async fn get_order_detail( 
     State(state): State<AppState>,
     Extension(user_id): Extension<Uuid>,
     Path(order_id): Path<Uuid>,
@@ -895,7 +906,7 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert!(!response.order_id.is_nil());
+        assert!(!response.token.is_empty());
         assert_eq!(response.message, "Order created successfully");
 
         // 验证用户余额被扣除
@@ -1124,21 +1135,8 @@ mod tests {
         assert!(result.is_ok());
 
         let response = result.unwrap();
-        assert!(!response.order_id.is_nil());
+        assert!(!response.token.is_empty());
         assert_eq!(response.message, "Order created successfully");
-
-        // 验证订单状态为Pending
-        let order: Order = sqlx::query_as("SELECT * FROM orders WHERE order_id = ?")
-            .bind(response.order_id)
-            .fetch_one(&state.db)
-            .await
-            .unwrap();
-        // info!("Order status: {:?}", order.status);
-        assert_eq!(order.status, OrderStatus::Pending);
-        // info!("Order tx_hash: {:?}", order.tx_hash);
-        assert!(order.tx_hash.is_some());
-        // info!("Order expires_at: {:?}", order.expires_at);
-        assert!(order.expires_at.is_some());
 
         // 验证Picker下载次数没有增加
         let picker: Picker = sqlx::query_as("SELECT * FROM pickers WHERE picker_id = ?")

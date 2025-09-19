@@ -87,8 +87,8 @@
   pointer-events: none;
 }
 
-/* Product Grid */
-.product-grid {
+/* Picker Grid */
+.picker-grid {
   flex: 1;
   padding: 24px 32px;
   display: grid;
@@ -150,7 +150,7 @@
     width: 100%;
   }
   
-  .product-grid {
+  .picker-grid {
     grid-template-columns: 1fr;
     padding: 16px;
   }

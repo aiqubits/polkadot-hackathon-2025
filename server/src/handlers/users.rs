@@ -129,13 +129,13 @@ pub async fn get_system_info(
     post,
     path = "/api/users/register",
     tag = "users",
-    summary = "用户注册",
-    description = "注册新用户账户",
+    summary = "Register a new user",
+    description = "Register a new user account",
     request_body = RegisterRequest,
     responses(
-        (status = 200, description = "注册成功", body = RegisterResponse),
-        (status = 400, description = "请求参数错误123321", body = crate::openapi::ErrorResponse),
-        (status = 422, description = "邮箱已被注册", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Registration successful", body = RegisterResponse),
+        (status = 400, description = "Bad request, invalid parameters", body = crate::openapi::ErrorResponse),
+        (status = 422, description = "Email already registered", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn register(
@@ -144,7 +144,7 @@ pub async fn register(
 ) -> Result<Json<RegisterResponse>, AppError> {
     // 验证邮箱格式
     if !crate::utils::is_valid_email(&payload.email) {
-        return Err(AppError::BadRequest("邮箱格式不正确".to_string()));
+        return Err(AppError::BadRequest("Invalid email format".to_string()));
     }
 
     // 检查邮箱是否已存在
@@ -157,7 +157,7 @@ pub async fn register(
     .map_err(|_| AppError::DatabaseError)?;
 
     if existing_user.is_some() {
-        return Err(AppError::UnprocessableEntity("邮箱已被注册".to_string()));
+        return Err(AppError::UnprocessableEntity("Email already registered".to_string()));
     }
 
     // 检查是否有相同邮箱的待注册信息
@@ -167,13 +167,13 @@ pub async fn register(
     };
 
     if pending_exists {
-        return Err(AppError::UnprocessableEntity("该邮箱正在注册中，请先完成验证或等待过期后重试".to_string()));
+        return Err(AppError::UnprocessableEntity("Email is already in registration process, please verify or wait for expiration".to_string()));
     }
 
     // 验证用户类型
     match payload.user_type {
         UserType::Gen | UserType::Dev => (),
-        // _ => return Err(AppError::UnprocessableEntity("无效的用户类型".to_string())),
+        // _ => return Err(AppError::UnprocessableEntity("Invalid user type".to_string())),
     }
 
     // 生成验证码
@@ -210,7 +210,7 @@ pub async fn register(
 
     Ok(Json(RegisterResponse {
         user_id: Uuid::nil(), // 暂时返回空ID，因为用户还未创建
-        message: "注册请求已提交，验证码已发送到您的邮箱，请验证后完成注册".to_string(),
+        message: "Registration request submitted, verification code sent to your email, please verify to complete registration".to_string(),
     }))
 }
 
@@ -219,12 +219,12 @@ pub async fn register(
     post,
     path = "/api/users/verify",
     tag = "users",
-    summary = "验证邮箱",
-    description = "使用验证码验证邮箱地址",
+    summary = "Verify email",
+    description = "Verify email address using verification code",
     request_body = VerifyRequest,
     responses(
-        (status = 200, description = "验证成功", body = VerifyResponse),
-        (status = 400, description = "验证码错误或已过期", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Verification successful", body = VerifyResponse),
+        (status = 400, description = "Verification failed, invalid code or expired", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn verify(
@@ -238,14 +238,14 @@ pub async fn verify(
     };
 
     let verification_code = verification_code.ok_or_else(|| {
-        AppError::BadRequest("验证码错误或已过期".to_string())
+        AppError::BadRequest("Verification failed, invalid code or expired".to_string())
     })?;
 
     if verification_code.code != payload.code || verification_code.expires_at < Utc::now() {
         // 验证失败，清理临时数据
         state.verification_codes.lock().unwrap().remove(&payload.email);
         state.pending_registrations.lock().unwrap().remove(&payload.email);
-        return Err(AppError::BadRequest("验证码错误或已过期，注册失败".to_string()));
+        return Err(AppError::BadRequest("Verification failed, invalid code or expired".to_string()));
     }
 
     // 获取待验证的注册信息
@@ -255,7 +255,7 @@ pub async fn verify(
     };
 
     let pending_registration = pending_registration.ok_or_else(|| {
-        AppError::BadRequest("注册信息不存在，请重新注册".to_string())
+        AppError::BadRequest("Verification failed, registration information does not exist, please re-register".to_string())
     })?;
 
     // 验证通过，开始创建用户
@@ -323,13 +323,13 @@ pub async fn verify(
     post,
     path = "/api/users/login",
     tag = "users",
-    summary = "用户登录",
-    description = "用户登录获取访问令牌",
+    summary = "Login user",
+    description = "User login to get access token",
     request_body = LoginRequest,
     responses(
-        (status = 200, description = "登录成功", body = LoginResponse),
-        (status = 401, description = "邮箱或密码错误", body = crate::openapi::ErrorResponse),
-        (status = 404, description = "用户不存在", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Login successful", body = LoginResponse),
+        (status = 401, description = "Email or password incorrect", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "User not found", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn login(
@@ -346,11 +346,11 @@ pub async fn login(
     .await
     .map_err(|_| AppError::DatabaseError)?;
 
-    let user = user.ok_or_else(|| AppError::NotFound("用户不存在".to_string()))?;
+    let user = user.ok_or_else(|| AppError::NotFound("User not found".to_string()))?;
 
     // 验证密码
     if !verify_password_with_user_id(&payload.user_password, user.user_id, &user.user_password, &state.password_salt) {
-        return Err(AppError::Unauthorized("邮箱或密码错误".to_string()));
+        return Err(AppError::Unauthorized("Email or password incorrect".to_string()));
     }
 
     // 生成JWT token
@@ -373,15 +373,15 @@ pub async fn login(
     get,
     path = "/api/users/profile",
     tag = "users",
-    summary = "获取用户资料",
-    description = "获取当前登录用户的详细信息",
+    summary = "Get user profile",
+    description = "Get detailed information of the current logged-in user",
     security(
         ("bearer_auth" = [])
     ),
     responses(
-        (status = 200, description = "获取成功", body = UserInfo),
-        (status = 401, description = "未授权访问", body = crate::openapi::ErrorResponse),
-        (status = 404, description = "用户不存在", body = crate::openapi::ErrorResponse)
+        (status = 200, description = "Get user profile successful", body = UserInfo),
+        (status = 401, description = "Unauthorized access", body = crate::openapi::ErrorResponse),
+        (status = 404, description = "User not found", body = crate::openapi::ErrorResponse)
     )
 )]
 pub async fn get_profile(
@@ -457,7 +457,7 @@ mod tests {
         
         let response = result.unwrap();
         assert!(!response.user_id.to_string().is_empty());
-        assert!(response.message.contains("验证码已发送"));
+        assert!(response.message.contains("Verification code sent"));
     }
 
     #[tokio::test]
@@ -475,7 +475,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            AppError::BadRequest(msg) => assert!(msg.contains("邮箱格式不正确")),
+            AppError::BadRequest(msg) => assert!(msg.contains("Email format is incorrect")),
             _ => panic!("Expected BadRequest error"),
         }
     }
@@ -589,7 +589,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            AppError::BadRequest(msg) => assert!(msg.contains("验证码错误或已过期")),
+            AppError::BadRequest(msg) => assert!(msg.contains("Verification code is incorrect or expired")),
             _ => panic!("Expected BadRequest error"),
         }
     }
@@ -631,7 +631,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            AppError::BadRequest(msg) => assert!(msg.contains("验证码错误或已过期")),
+            AppError::BadRequest(msg) => assert!(msg.contains("Verification code is incorrect or expired")),
             _ => panic!("Expected BadRequest error"),
         }
     }
@@ -690,7 +690,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            AppError::NotFound(msg) => assert!(msg.contains("用户不存在")),
+            AppError::NotFound(msg) => assert!(msg.contains("User not found")),
             _ => panic!("Expected NotFound error"),
         }
     }
@@ -732,7 +732,7 @@ mod tests {
         assert!(result.is_err());
         
         match result.unwrap_err() {
-            AppError::Unauthorized(msg) => assert!(msg.contains("邮箱或密码错误")),
+            AppError::Unauthorized(msg) => assert!(msg.contains("Email or password is incorrect")),
             _ => panic!("Expected Unauthorized error"),
         }
     }

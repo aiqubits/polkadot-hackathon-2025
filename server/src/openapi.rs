@@ -54,16 +54,16 @@ use crate::download::DownloadQuery;
         )
     ),
     tags(
-        (name = "health", description = "健康检查接口"),
-        (name = "users", description = "用户管理接口"),
-        (name = "pickers", description = "Picker管理接口"),
-        (name = "orders", description = "订单管理接口"),
-        (name = "download", description = "文件下载接口"),
+        (name = "health", description = "Health check endpoints"),
+        (name = "users", description = "User management endpoints"),
+        (name = "pickers", description = "Picker management endpoints"),
+        (name = "orders", description = "Order management endpoints"),
+        (name = "download", description = "File download endpoints"),
     ),
     info(
         title = "Picker Server API",
-        version = "1.0.0",
-        description = "Picker 服务器 API 文档",
+        version = "0.0.1",
+        description = "Picker Server API documentation",
         contact(
             name = "API Support",
             email = "openpicklabs@hotmail.com"
@@ -96,7 +96,7 @@ impl utoipa::Modify for SecurityAddon {
                     utoipa::openapi::security::HttpBuilder::new()
                         .scheme(utoipa::openapi::security::HttpAuthScheme::Bearer)
                         .bearer_format("JWT")
-                        .description(Some("请输入 Bearer Token，格式：Bearer <your-token>"))
+                        .description(Some("Enter Bearer Token in the format: Bearer <your-token>"))
                         .build(),
                 ),
             )
