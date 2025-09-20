@@ -1,8 +1,7 @@
 use app_lib::api::client::{ApiClient, ApiError};
+use app_lib::api::models::UploadPickerResponse;
 use app_lib::config::AppConfig;
 use mockito::Server;
-use reqwest::Error as ReqwestError;
-use std::time::Duration;
 
 // 测试Download方法
 #[tokio::test]
@@ -141,7 +140,7 @@ async fn test_upload_file_successful() {
 
     // 执行上传
     let result = api_client
-        .upload_file(
+        .upload_file::<UploadPickerResponse>(
             "/api/pickers",
             "test-picker",
             "A test picker",
@@ -186,7 +185,7 @@ async fn test_upload_file_without_image() {
 
     // 执行上传
     let result = api_client
-        .upload_file(
+        .upload_file::<UploadPickerResponse>(
             "/api/pickers",
             "test-picker",
             "A test picker",
@@ -230,7 +229,7 @@ async fn test_upload_file_server_error() {
 
     // 执行上传
     let result = api_client
-        .upload_file(
+        .upload_file::<UploadPickerResponse>(
             "/api/pickers",
             "test-picker",
             "A test picker",
@@ -282,7 +281,7 @@ async fn test_upload_file_timeout_retry() {
 
     // 执行上传，应该会重试
     let result = api_client
-        .upload_file(
+        .upload_file::<UploadPickerResponse>(
             "/api/pickers",
             "test-picker",
             "A test picker",

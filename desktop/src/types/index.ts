@@ -85,7 +85,8 @@ export interface Task {
   status: 'running' | 'idle' | 'error';
   installed: string;
   runs: number;
-  lastRun: string;
+  last_run: string;
+  picker_path: string;
 }
 
 export type TaskStatus = 'all' | 'running' | 'idle' | 'error';

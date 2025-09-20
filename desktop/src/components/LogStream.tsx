@@ -1,77 +1,27 @@
 import { useState, useRef, useEffect } from 'react'
 import './LogStream.css'
+import { taskAPI, type TaskLog } from '../client/taskApi'
 
 interface LogEntry {
   id: string
   message: string
-  type: 'success' | 'error' | 'warning' | 'info'
+  type: 'error' | 'warning' | 'info'
+  timestamp: number
+  taskId: string
 }
 
 const LogStream = () => {
-  // 模拟日志数据
-  const [logs] = useState<LogEntry[]>([
-    {
-      id: '1',
-      message: 'Starting task "Data Automation Pipeline"...',
-      type: 'info'
-    },
-    {
-      id: '2',
-      message: 'Loading configuration from data.config.json',
-      type: 'info'
-    },
-    {
-      id: '3',
-      message: 'Connecting to data source... Connected.',
-      type: 'success'
-    },
-    {
-      id: '4',
-      message: 'Processing batch #1 (250 records)',
-      type: 'info'
-    },
-    {
-      id: '5',
-      message: 'Processing batch #2 (250 records)',
-      type: 'info'
-    },
-    {
-      id: '6',
-      message: 'Processing batch #3 (250 records)',
-      type: 'info'
-    },
-    {
-      id: '7',
-      message: 'Processing complete. 750 records processed.',
-      type: 'success'
-    },
-    {
-      id: '8',
-      message: 'Generating summary report...',
-      type: 'info'
-    },
-    {
-      id: '9',
-      message: 'Summary report available at /reports/summary_240301_153042.json',
-      type: 'success'
-    },
-    {
-      id: '10',
-      message: 'Task completed successfully in 12.4 seconds.',
-      type: 'success'
-    },
-    {
-      id: '11',
-      message: 'Starting scheduled task "Server Monitoring Agent"',
-      type: 'info'
-    }
-  ])
+  // 动态日志数据
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  
+  // 存储每个任务的最新日志条目ID，用于防止重复
+  // const latestLogIdsRef = useRef<Map<string, number>>(new Map())
 
   // 筛选状态
   const [filters, setFilters] = useState({
     error: true,
     warning: true,
-    info: true
+    info: true,
   })
 
   // 面板状态
@@ -80,6 +30,57 @@ const LogStream = () => {
   const [height, setHeight] = useState('200px')
   const [resizing, setResizing] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // 添加日志的方法
+  const addLog = (taskLog: TaskLog) => {
+    setLogs(prev => {
+      // 限制日志数量，避免内存占用过大
+      const MAX_LOGS = 500
+      const newLogs = [...prev]
+      
+      // 创建新的日志条目
+      const logEntry: LogEntry = {
+        id: `${taskLog.task_id}-${taskLog.timestamp}`,
+        message: taskLog.message,
+        type: taskLog.type, // 直接使用原始类型，不再做错误的映射
+        timestamp: taskLog.timestamp,
+        taskId: taskLog.task_id
+      }
+      
+      // 添加到日志数组开头
+      newLogs.unshift(logEntry)
+      
+      // 如果超过最大日志数量，移除最旧的日志
+      if (newLogs.length > MAX_LOGS) {
+        newLogs.splice(MAX_LOGS)
+      }
+      
+      return newLogs
+    })
+  }
+
+  // 监听日志事件
+  useEffect(() => {
+    const logListener = async () => {
+      try {
+        // 注册全局日志监听器，接收所有任务的日志
+        await taskAPI.addLogListener('global', (log) => {
+          addLog(log)
+        })
+        
+        console.log('Log listener initialized')
+      } catch (error) {
+        console.error('Failed to initialize log listener:', error)
+      }
+    }
+    
+    logListener()
+    
+    // 组件卸载时清理监听器
+    return () => {
+      taskAPI.removeLogListener('global')
+    }
+  }, [])
 
   // 筛选后的日志
   const filteredLogs = logs.filter(log => {
@@ -239,18 +240,37 @@ const LogStream = () => {
           </div>
           
           {/* 日志内容区域 */}
-          <div className="log-content">
-            {filteredLogs.length === 0 ? (
-              <div className="log-empty">没有符合筛选条件的日志</div>
-            ) : (
-              filteredLogs.map((entry) => (
-                <div key={entry.id} className={`log-entry ${entry.type}`}>
-                  <span className="log-prefix">&gt;</span>
-                  <span className="log-message">{entry.message}</span>
-                </div>
-              ))
-            )}
-          </div>
+              <div className="log-content">
+                {filteredLogs.length === 0 ? (
+                  <div className="log-empty">
+                    {logs.length === 0 ? 
+                      '等待任务运行，日志将显示在这里...' : 
+                      '没有符合筛选条件的日志'
+                    }
+                  </div>
+                ) : (
+                  filteredLogs.map((entry) => {
+                    // 格式化时间戳
+                    const time = new Date(entry.timestamp).toLocaleTimeString()
+                    
+                    return (
+                      <div key={entry.id} className={`log-entry ${entry.type}`}>
+                        <span className="log-time">[{time}]</span>
+                        <span className={`log-level ${entry.type}`}>
+                          {entry.type.toUpperCase()}
+                        </span>
+                        {entry.taskId && (
+                          <span className="log-task-id">
+                            [Task: {entry.taskId.slice(0, 8)}...]
+                          </span>
+                        )}
+                        <span className="log-prefix">&gt;</span>
+                        <span className="log-message">{entry.message}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
         </div>
       )}
     </>

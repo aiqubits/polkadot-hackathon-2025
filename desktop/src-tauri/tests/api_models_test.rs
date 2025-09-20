@@ -21,7 +21,7 @@ fn test_api_error_serialization() {
     let error = ApiError::NotFound;
     let json = serde_json::to_string(&error).unwrap();
     assert!(json.contains("NotFound"));
-    assert!(json.contains("未找到资源"));
+    assert!(json.contains("Not found"));
     
     // 测试ValidationError序列化
     let error = ApiError::ValidationError("Invalid parameter".to_string());
@@ -146,6 +146,7 @@ fn test_register_request() {
 fn test_picker_info() {
     let picker_info = PickerInfo {
         picker_id: "picker-123".to_string(),
+        dev_user_id: "dev-123".to_string(),
         alias: "Test Picker".to_string(),
         description: "This is a test picker".to_string(),
         price: 500,
@@ -153,6 +154,8 @@ fn test_picker_info() {
         version: "1.0.0".to_string(),
         download_count: 100,
         created_at: "2023-01-01T10:00:00Z".to_string(),
+        updated_at: "2023-01-01T10:00:00Z".to_string(),
+        status: "active".to_string(),
     };
     
     // 序列化
@@ -215,6 +218,7 @@ fn test_order_status() {
 fn test_picker_list_response() {
     let picker_info = PickerInfo {
         picker_id: "picker-123".to_string(),
+        dev_user_id: "dev-123".to_string(),
         alias: "Test Picker".to_string(),
         description: "This is a test picker".to_string(),
         price: 500,
@@ -222,6 +226,8 @@ fn test_picker_list_response() {
         version: "1.0.0".to_string(),
         download_count: 100,
         created_at: "2023-01-01T10:00:00Z".to_string(),
+        updated_at: "2023-01-01T10:00:00Z".to_string(),
+        status: "active".to_string(),
     };
     
     let picker_list = PickerListResponse {

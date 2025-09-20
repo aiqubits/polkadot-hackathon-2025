@@ -120,7 +120,7 @@
   }
   ```
 - **返回**:
-  - `200`: `{ "order_id": "uuid", "message": "string" }`
+  - `200`: `{ "token": "string", "message": "string" }`
   - `400`: 请求参数错误
   - `404`: 用户或Picker不存在
   - `500`: 服务器内部错误

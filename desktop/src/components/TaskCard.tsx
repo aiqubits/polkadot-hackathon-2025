@@ -76,7 +76,7 @@ const TaskCard = ({ task }: TaskCardProps) => {
         <div className="last-run">
           <span className="last-run-icon">🕒</span>
           <span className="last-run-label">Last:</span>
-          <span className="last-run-value">{formatDate(task.lastRun)}</span>
+          <span className="last-run-value">{formatDate(task.last_run)}</span>
         </div>
       </div>
     </div>

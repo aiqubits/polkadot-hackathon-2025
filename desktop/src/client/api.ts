@@ -31,54 +31,7 @@ const localUsers = [
   }
 ]
 
-// 模拟任务数据库
-const localTasksDatabase = [
-  {
-    id: '1',
-    user_id: '1',
-    name: 'Data Automation Pipeline',
-    status: 'running' as const,
-    installed: '240128',
-    runs: 128,
-    lastRun: '240301'
-  },
-  {
-    id: '2',
-    user_id: '1',
-    name: 'Customer Data Processing',
-    status: 'idle' as const,
-    installed: '240205',
-    runs: 84,
-    lastRun: '240228'
-  },
-  {
-    id: '3',
-    user_id: '1',
-    name: 'Server Monitoring Agent',
-    status: 'running' as const,
-    installed: '240112',
-    runs: 312,
-    lastRun: '240301'
-  },
-  {
-    id: '4',
-    user_id: '1',
-    name: 'Backup System Task',
-    status: 'error' as const,
-    installed: '240220',
-    runs: 28,
-    lastRun: '240229'
-  },
-  {
-    id: '5',
-    user_id: '2',
-    name: 'Admin Dashboard Update',
-    status: 'running' as const,
-    installed: '240115',
-    runs: 200,
-    lastRun: '240301'
-  }
-]
+
 
 // 模拟产品数据库
 const localPickersDatabase = [
@@ -418,15 +371,13 @@ class APIService {
     await delay(400)
     
     // 计算用户的统计数据
-    const userTasks = localTasksDatabase.filter(task => task.user_id === userId)
-    const completedTasks = userTasks.filter(task => task.status === 'idle').length
     const toolsUsed = (localInstalledToolsDatabase[userId] || []).length
     
     return {
       stats: {
         toolsUsed,
         contributions: 0, // 简化示例
-        tasksCompleted: completedTasks,
+        tasksCompleted: 0, // 简化示例
         monthsActive: 8,
         storageUsed: 1.2,
         storageTotal: 5,
@@ -475,45 +426,7 @@ class APIService {
     return picker;
   }
 
-  // 创建本地 Picker
-  async createLocalPicker(userId: string, pickerName: string): Promise<unknown> {
-    await delay(800)
-    
-    const newTask = {
-      id: Date.now().toString(),
-      user_id: userId,
-      name: pickerName,
-      status: 'idle' as const,
-      installed: new Date().toISOString().slice(2, 8).replace('-', ''),
-      runs: 0,
-      lastRun: ''
-    }
-    
-    localTasksDatabase.push(newTask)
-    
-    return newTask
-  }
 
-  // Picker安装之后，运行时为任务
-  async updateTaskStatus(taskId: string, status: 'running' | 'idle' | 'error'): Promise<unknown> {
-    await delay(600)
-    
-    const task = localTasksDatabase.find(t => t.id === taskId)
-    
-    if (!task) {
-      throw new Error('Task not found')
-    }
-    
-    task.status = status
-    
-    // 如果状态变为 running，更新最后运行时间和运行次数
-    if (status === 'running') {
-      task.lastRun = new Date().toISOString().slice(2, 8).replace('-', '')
-      task.runs += 1
-    }
-    
-    return 'Task status updated successfully';
-  }
 
   // 上传本地 Picker，仅 Dev权限
   async uploadLocalPicker(alias: string, description: string, version: string, price: number, file: File, image?: File): Promise<unknown> {
@@ -735,18 +648,19 @@ class APIService {
 //     }
 //   }
   
-//   // 文件上传相关接口
-//   async uploadFile(file: File): Promise<unknown> {
-//     await delay(2000) // 模拟上传时间
+  // 文件上传相关接口
+  async uploadFile(file: File): Promise<unknown> {
+    await delay(2000) // 模拟上传时间
     
-//     return {
-//       success: true,
-//       fileId: Date.now().toString(),
-//       fileName: file.name,
-//       fileSize: file.size,
-//       uploadTime: new Date().toISOString()
-//     }
-//   }
+    return {
+      success: true,
+      fileId: Date.now().toString(),
+      fileName: file.name,
+      fileSize: file.size,
+      uploadTime: new Date().toISOString()
+    }
+  }
+
 
 }
 

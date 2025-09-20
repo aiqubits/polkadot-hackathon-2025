@@ -244,18 +244,16 @@ pub struct AppConfig {
 - `MAX_RETRIES`：最大重试次数，默认为 3
 
 ### 2. 配置文件
-配置文件位于操作系统配置目录下的 `picker-desktop/config.json`。例如：
-- Windows: `%APPDATA%\picker-desktop\config.json`
-- macOS: `~/Library/Application Support/picker-desktop/config.json`
-- Linux: `~/.config/picker-desktop/config.json`
+配置文件位于操作系统配置目录下的 `picker-desktop/config.toml`。例如：
+- Windows: `%APPDATA%\Roaming\picker-desktop\config.toml`
+- macOS: `~/Library/Application Support/picker-desktop/config.toml`
+- Linux: `~/.config/picker-desktop/config.toml`
 
 配置文件格式：
-```json
-{
-  "api_base_url": "http://api.example.com",
-  "request_timeout_ms": 30000,
-  "max_retries": 3
-}
+```toml
+api_base_url = "http://api.example.com"
+request_timeout_ms = 30000
+max_retries = 3
 ```
 
 ## 错误处理

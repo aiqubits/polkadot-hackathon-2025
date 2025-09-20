@@ -1,19 +1,13 @@
 // 用户相关命令
 
-use crate::api::client::{ApiClient, ApiError};
+use crate::api::client::ApiClient;
 use crate::api::models::{ConnectionStatus, SystemInfo, LoginRequest, LoginResponse, ResponseUserInfo, RegisterRequest, RegisterResponse, UserInfo, VerifyRequest, VerifyResponse};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
-use alloy::sol_types::sol_data::Bool;
-use serde_json::to_string;
 use tauri::State;
 use crate::api::models::UserType;
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::primitives::{Address, Uint};
-use alloy::sol;
-use alloy::primitives::{U256, FixedBytes};
-use alloy::signers::local::PrivateKeySigner;
-use alloy::rpc::types::TransactionReceipt;
 
 // #[tauri::command]
 // pub async fn simple_connection_test(name: &str) -> Result<String, String> {
@@ -176,7 +170,7 @@ pub async fn register(
     } else {
         UserType::Gen
     };
-    println!("user_type_enum: {:?}", user_type_enum);
+
     let request = RegisterRequest {
         email,
         user_name,

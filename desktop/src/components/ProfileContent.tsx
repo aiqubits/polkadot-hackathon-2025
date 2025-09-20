@@ -1,7 +1,7 @@
 import './ProfileContent.css'
-import type { Activity, InstalledTool, ProfileStats } from '../types'
+import type { Activity, InstalledTool, ResponseUserInfo } from '../types'
 import { useState, useEffect } from 'react';
-import { clientAPI, type ResponseUserInfo } from '../client/api'
+import { clientAPI } from '../client/api'
 
 // interface ProfileContentProps {
 //   // 可以添加从父组件传入的属性
@@ -106,7 +106,7 @@ const ProfileContent = () => {
   }, []);
 
   // 模拟最近活动数据
-  const [recentActivities, _setRecentActivities] = useState<Activity[]>([
+  const [recentActivities, ] = useState<Activity[]>([
     {
       id: '1',
       type: 'installation',
@@ -138,7 +138,7 @@ const ProfileContent = () => {
   ]);
 
   // 模拟已安装工具数据
-  const [installedTools, _setInstalledTools] = useState<InstalledTool[]>([
+  const [installedTools, ] = useState<InstalledTool[]>([
     {
       id: '1',
       name: 'Server Monitoring',

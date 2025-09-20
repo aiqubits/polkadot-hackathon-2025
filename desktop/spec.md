@@ -76,7 +76,8 @@ interface Task {
   status: 'running' | 'idle' | 'error';
   installed: string;
   runs: number;
-  lastRun: string;
+  last_run: string;
+  picker_path: string;
 }
 6. 技术实现要点
 使用CSS Grid实现任务卡片的响应式布局

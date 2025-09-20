@@ -30,7 +30,7 @@ const mainWindow = getCurrentWindow()
 let isClosing = false
 
 // 添加窗口关闭事件监听
-mainWindow.onCloseRequested(async (event: any) => {
+mainWindow.onCloseRequested(async (event) => {
  // 如果已经在关闭过程中，直接允许关闭
   if (isClosing) {
     return

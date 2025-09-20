@@ -1,7 +1,7 @@
 // Picker 相关命令
 
 use crate::api::client::ApiClient;
-use crate::api::models::{ApiError, PickerInfo, PickerListResponse, UploadPickerRequest, UploadPickerResponse};
+use crate::api::models::{ApiError, PickerListResponse, UploadPickerResponse};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
 use std::collections::HashMap;
@@ -34,7 +34,6 @@ pub async fn get_picker_marketplace(
     for (k, v) in &owned_params {
         str_params.insert(&**k, &**v);
     }
-    println!("Marketplace API request str_params: {:?}", str_params);
     
     api_client.get("/api/pickers", Some(&str_params)).await.map_err(|e| e.to_string())
 }
@@ -54,29 +53,24 @@ pub async fn get_picker_detail(
     // 加载配置
     let config = match AppConfig::load() {
         Ok(config) => {
-            println!("Loaded config: api_base_url={}", config.api_base_url);
             config
         },
         Err(err) => {
             let default_config = AppConfig::default();
-            println!("Failed to load config: {}, using default config: api_base_url={}", 
-                     err, default_config.api_base_url);
+            
             default_config
         }
     };
     
     let api_client = ApiClient::new(&config, None);
     let path = format!("/api/pickers/{}", picker_id);
-    println!("Making API request to path: {}", path);
     
     // 使用更详细的错误处理
     match api_client.get(&path, None).await {
         Ok(response) => {
-            println!("get_picker_detail, response received: {:?}", response);
             Ok(response)
         },
         Err(err) => {
-            println!("API error: {:?}", err);
             // 返回更具体的错误信息
             match err {
                 ApiError::ValidationError(e) => Err(format!("验证错误: {}", e)),

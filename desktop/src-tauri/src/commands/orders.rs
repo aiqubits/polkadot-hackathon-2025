@@ -1,7 +1,7 @@
 // 订单相关命令
 
 use crate::api::client::ApiClient;
-use crate::api::models::{ApiError, CreateOrderRequest, OrderInfo, OrderListResponse, CreateOrderResponse};
+use crate::api::models::{CreateOrderRequest, OrderInfo, OrderListResponse, CreateOrderResponse};
 use crate::config::AppConfig;
 use crate::utils::auth::AuthManager;
 use std::collections::HashMap;
@@ -46,8 +46,6 @@ pub async fn create_order(
     pay_type: String,
     auth_manager: State<'_, AuthManager>,
 ) -> Result<CreateOrderResponse, String> {
-    println!("create_order: {:?}", &picker_id);
-    println!("create_order: {:?}", &pay_type);
     let config = AppConfig::load().unwrap_or_else(|_| AppConfig::default());
     let api_client = ApiClient::new(&config, Some(auth_manager.inner().clone()));
     

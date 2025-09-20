@@ -104,7 +104,8 @@ const mockTasks: Task[] = [
     status: 'running',  // 任务状态：'running'|'idle'|'error'
     installed: '240128',  // 安装日期（格式：YYMMDD）
     runs: 128,  // 运行次数
-    lastRun: '240301'  // 最后运行日期（格式：YYMMDD）
+    last_run: '240301'  // 最后运行日期（格式：YYMMDD）
+    picker_path: 'entry.py' // 选择器路径
   },
   // 更多任务...
 ]

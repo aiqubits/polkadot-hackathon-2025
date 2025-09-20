@@ -2,7 +2,7 @@
 // 导入必要的模块
 use tauri::{Builder, Manager};
 use tauri_plugin_store::{StoreBuilder};
-use log::LevelFilter;
+use tauri_plugin_dialog::init as init_dialog_plugin;
 
 // 导入命令模块
 pub mod commands;
@@ -12,9 +12,6 @@ pub mod config;
 
 // 导入认证管理器
 use crate::utils::auth::AuthManager;
-
-// 认证存储键
-const AUTH_STORE_KEY: &str = "auth";
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -26,6 +23,7 @@ pub fn run() {
   Builder::default()
     // 设置插件
     .plugin(tauri_plugin_store::Builder::default().build())
+    .plugin(init_dialog_plugin())
     .setup(|app| {
       // 在调试模式下启用日志插件
       if cfg!(debug_assertions) {
@@ -75,7 +73,19 @@ pub fn run() {
       commands::orders::get_order_detail,
       
       // 下载相关命令
-      commands::download::download_picker
+      commands::download::download_picker,
+      
+      // 任务相关命令
+      commands::task::get_task_config,
+      commands::task::get_env_config,
+      commands::task::get_project_config,
+      commands::task::get_task_schema,
+      commands::task::list_tasks,
+      commands::task::create_task,
+      commands::task::run_task,
+      commands::task::stop_task,
+      commands::task::setup_env,
+      commands::task::delete_task
     ))
     // 运行应用
     .run(tauri::generate_context!())
@@ -85,13 +95,7 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    // 测试 AUTH_STORE_KEY 常量
-    #[test]
-    fn test_auth_store_key_constant() {
-        assert_eq!(AUTH_STORE_KEY, "auth");
-    }
-    
+        
     // 测试模块导入
     #[test]
     fn test_module_imports() {

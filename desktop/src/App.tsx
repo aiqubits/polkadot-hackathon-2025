@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import './App.css'
 import MarketplaceContent from './components/MarketplaceContent'
 import ProfileContent from './components/ProfileContent'
 import ChatbotContent from './components/ChatbotContent'
 import LogStream from './components/LogStream'
+import MainContent from './components/MainContent'
 import { clientAPI } from './client/api'
 import type { ResponseUserInfo } from './types'
 
@@ -16,72 +17,7 @@ interface User {
   premium: number;
 }
 
-// 简化的任务类型
-interface Task {
-  id: string
-  name: string
-  status: 'running' | 'idle' | 'error'
-  installed: string
-  runs: number
-  lastRun: string
-}
-
-// 模拟任务数据
-const mockTasks: Task[] = [
-  {
-    id: '1',
-    name: 'Data Automation Pipeline',
-    status: 'running',
-    installed: '240128',
-    runs: 128,
-    lastRun: '240301'
-  },
-  {
-    id: '2',
-    name: 'Customer Data Processing',
-    status: 'idle',
-    installed: '240205',
-    runs: 84,
-    lastRun: '240228'
-  },
-  {
-    id: '3',
-    name: 'Server Monitoring Agent',
-    status: 'running',
-    installed: '240112',
-    runs: 312,
-    lastRun: '240301'
-  },
-  {
-    id: '4',
-    name: 'Backup System Task',
-    status: 'error',
-    installed: '240220',
-    runs: 28,
-    lastRun: '240229'
-  },
-  {
-    id: '5',
-    name: 'File Conversion Service',
-    status: 'idle',
-    installed: '240125',
-    runs: 95,
-    lastRun: '240227'
-  },
-  {
-    id: '6',
-    name: 'API Integration Worker',
-    status: 'running',
-    installed: '240218',
-    runs: 43,
-    lastRun: '240301'
-  }
-]
-
 function App() {
-  const [tasks] = useState<Task[]>(mockTasks)
-  const [activeFilter, setActiveFilter] = useState<'all' | 'running' | 'idle' | 'error'>('all')
-  const [searchQuery, setSearchQuery] = useState('')
   const [activePage, setActivePage] = useState<'home' | 'chatbot' | 'marketplace' | 'profile'>('home')
   
   // 登录状态管理
@@ -90,37 +26,16 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [showSignupModal, setShowSignupModal] = useState(false)
 
-  // 窗口关闭事件监听，用于清理Token
-  useEffect(() => {
-    const cleanupTokenOnClose = async () => {
-      try {
-        // 检查是否已登录
-        alert('Logging out123...')
-        const loggedIn = await clientAPI.checkLoginStatus()
-        if (loggedIn) {
-          // 静默调用logout清理Token，但不显示alert
-          alert('Logging out...')
-          await clientAPI.logout()
-        }
-      } catch (error) {
-        console.error('Failed to cleanup token on close:', error)
-      }
-    }
-
-    // 添加窗口关闭事件监听
-    window.addEventListener('beforeunload', cleanupTokenOnClose)
-
-    // 清理函数
-    return () => {
-      window.removeEventListener('beforeunload', cleanupTokenOnClose)
-    }
-  }, [])
-
-  const filteredTasks = tasks.filter(task => {
-    const matchesFilter = activeFilter === 'all' || task.status === activeFilter
-    const matchesSearch = task.name.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesFilter && matchesSearch
-  })
+  // 表单状态管理
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupUsername, setSignupUsername] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [verifyEmail, setVerifyEmail] = useState('');
+  const [verifyCode, setVerifyCode] = useState('');
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
 
   // API调用函数
   const handleLogin = async (email: string, password: string) => {
@@ -148,8 +63,8 @@ function App() {
       
       // 注册成功后，显示验证邮箱的弹窗
       setShowSignupModal(false);
-      setVerifyEmail(email);
       setShowVerifyModal(true);
+      setVerifyEmail(email);
     } catch (error) {
       console.error('Registration error:', error);
       alert('Registration failed. ' + (error instanceof Error ? error.message : 'Please try again.'));
@@ -158,51 +73,27 @@ function App() {
 
   const handleVerifyEmail = async (email: string, code: string) => {
     try {
-      const message = await clientAPI.verifyEmail(email, code);
-      
+      await clientAPI.verifyEmail(email, code);
+      alert('Email verified successfully! You can now login.');
       setShowVerifyModal(false);
-      alert(message);
       setShowLoginModal(true);
     } catch (error) {
-      console.error('Verification error:', error);
+      console.error('Email verification error:', error);
       alert('Verification failed. ' + (error instanceof Error ? error.message : 'Please try again.'));
     }
   };
 
   const handleLogout = async () => {
     try {
-      const message = await clientAPI.logout();
-      
-      // 清除用户登录状态
-      setCurrentUser(null);
+      await clientAPI.logout();
       setIsLoggedIn(false);
+      setCurrentUser(null);
       setShowLogoutMenu(false);
-      alert(message);
     } catch (error) {
       console.error('Logout error:', error);
       alert('Logout failed. ' + (error instanceof Error ? error.message : 'Please try again.'));
     }
   };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running': return '#10b981'
-      case 'idle': return '#3b82f6'
-      case 'error': return '#ef4444'
-      default: return '#6b7280'
-    }
-  }
-
-  // 状态管理
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupUsername, setSignupUsername] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [verifyEmail, setVerifyEmail] = useState('');
-  const [verifyCode, setVerifyCode] = useState('');
-  const [showVerifyModal, setShowVerifyModal] = useState(false);
-  const [showLogoutMenu, setShowLogoutMenu] = useState(false);
 
   return (
     <div className="app">
@@ -329,81 +220,7 @@ function App() {
         {/* Main Content */}
         <div className="main-content">
           {activePage === 'home' ? (
-            <>
-              <div className="content-header">
-                {/* <h1 className="page-title">My Pickers</h1> */}
-                <div className="header-controls">
-                  <div className="filter-tabs">
-                    {(['all', 'running', 'idle', 'error'] as const).map(filter => (
-                      <button
-                        key={filter}
-                        className={`filter-tab ${activeFilter === filter ? 'active' : ''}`}
-                        onClick={() => setActiveFilter(filter)}
-                      >
-                        {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="search-container">
-                    <input
-                      type="text"
-                      placeholder="Search tasks..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="search-input"
-                    />
-                    <span className="search-icon">🔍</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="task-grid">
-                {filteredTasks.map(task => (
-                  <div key={task.id} className="task-card" data-status={task.status}>
-                    <div className="task-header">
-                      <h3 className="task-name">{task.name}</h3>
-                      <button className="task-menu">⋮</button>
-                    </div>
-                    
-                    <div className="task-info">
-                      <div className="info-row">
-                        <span className="info-icon">📅</span>
-                        <span className="info-label">Installed:</span>
-                        <span className="info-value">{task.installed}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-icon">▶️</span>
-                        <span className="info-label">Runs:</span>
-                        <span className="info-value">{task.runs}</span>
-                      </div>
-                    </div>
-
-                    <div className="task-status">
-                      <div className="status-indicator">
-                        <span 
-                          className="status-dot"
-                          style={{ color: getStatusColor(task.status) }}
-                        >
-                          ●
-                        </span>
-                        <span className="status-text" style={{ color: getStatusColor(task.status) }}>
-                          {task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                        </span>
-                      </div>
-                      <div className="last-run">
-                        <span className="last-run-icon">🕒</span>
-                        <span className="last-run-label">Last:</span>
-                        <span className="last-run-value">{task.lastRun}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button className="add-button">
-                <span className="add-icon">+</span>
-              </button>
-            </>
+            <MainContent />
           ) : activePage === 'chatbot' ? (
             <ChatbotContent />
           ) : activePage === 'marketplace' ? (

@@ -1,7 +1,6 @@
 #![cfg(test)]
 
 use mockito::Server;
-use reqwest::Client;
 use serde_json::json;
 use std::env;
 

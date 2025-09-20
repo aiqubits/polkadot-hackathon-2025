@@ -35,14 +35,6 @@ impl ApiClient {
         T: serde::Serialize,
         U: serde::de::DeserializeOwned,
     {
-        println!("post-path: {:?}", path);
-        // 添加以下代码来打印body
-        if let Ok(body_json) = serde_json::to_string_pretty(body) {
-            println!("post-body: {}", body_json);
-        } else {
-            println!("Failed to serialize body");
-        }
-
         let url = format!("{}{}", self.base_url, path);
         let mut request_builder = self.client.post(&url).json(body);
         
@@ -52,7 +44,7 @@ impl ApiClient {
                 request_builder = request_builder.header("Authorization", auth_header);
             }
         }
-        println!("post-request_builder: {:?}", request_builder);
+
         self.execute_request(request_builder).await
     }
     
@@ -241,7 +233,6 @@ async fn execute_request<U>(&self, request_builder: RequestBuilder) -> Result<U,
 where
     U: serde::de::DeserializeOwned,
 {
-    println!("execute_request: {:?}", request_builder);
     let mut retries = 0;
     
     // 尝试克隆请求构建器，如果失败则只能尝试一次（不重试）
@@ -255,10 +246,7 @@ where
                     if status.is_success() {
                         // 首先尝试获取原始文本以进行调试
                         match response.text().await {
-                            Ok(raw_text) => {
-                                // 记录响应内容以进行调试
-                                println!("API Response: URL={}, Status={}, Body={}", url, status, raw_text);
-                                
+                            Ok(raw_text) => {                                
                                 // 首先尝试解析为JSON
                                 if let Ok(data) = serde_json::from_str(&raw_text) {
                                     return Ok(data);
@@ -274,7 +262,6 @@ where
                                 return Err(ApiError::ValidationError("Failed to parse response content".to_string()));
                             },
                             Err(text_err) => {
-                                println!("Failed to read response text: {}", text_err);
                                 return Err(ApiError::NetworkError(text_err.into()));
                             },
                         }
@@ -309,10 +296,7 @@ where
                 if status.is_success() {
                     // 首先尝试获取原始文本以进行调试
                     match response.text().await {
-                        Ok(raw_text) => {
-                            // 记录响应内容以进行调试
-                            println!("API Response: URL={}, Status={}, Body={}", url, status, raw_text);
-                            
+                        Ok(raw_text) => {                            
                             // 首先尝试解析为JSON
                             if let Ok(data) = serde_json::from_str(&raw_text) {
                                 return Ok(data);
@@ -328,7 +312,6 @@ where
                             return Err(ApiError::ValidationError("Failed to parse response content".to_string()));
                         },
                         Err(text_err) => {
-                            println!("Failed to read response text: {}", text_err);
                             return Err(ApiError::NetworkError(text_err.into()));
                         },
                     }
@@ -376,12 +359,7 @@ where
 mod tests {
     use super::*;
     use crate::config::AppConfig;
-    use crate::utils::auth::AuthManager;
     use serde::{Deserialize, Serialize};
-    use tauri::{State, Wry};
-    use tauri_plugin_store::{Store, StoreBuilder};
-    use std::sync::Arc;
-    use std::sync::Mutex;
     
     // 测试数据模型
     #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -406,16 +384,6 @@ mod tests {
             // 其他配置使用默认值
             ..Default::default()
         }
-    }
-    
-    // 创建测试用的AuthManager
-    fn create_test_auth_manager() -> AuthManager {
-        // 创建一个简单的mock Store
-        let app = tauri::Builder::default().build(tauri::generate_context!()).unwrap();
-        let store = StoreBuilder::new(app.handle(), "auth_test.json").build().unwrap();
-        
-        // 直接传递store给AuthManager::new()
-        AuthManager::new(store)
     }
     
     // 模拟的ApiClient用于测试，避免网络请求

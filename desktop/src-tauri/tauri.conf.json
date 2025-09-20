@@ -3,6 +3,7 @@
   "productName": "picker-desktop",
   "version": "0.1.0",
   "identifier": "com.tauri.build",
+
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +13,7 @@
   "app": {
     "windows": [
       {
-        "title": "picker",
+        "title": "Picker - AI powered Smart System for your everything",
         "width": 800,
         "height": 600,
         "resizable": true,

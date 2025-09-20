@@ -1,8 +1,7 @@
 use app_lib::api::client::{ApiClient, ApiError};
+use app_lib::api::models::UploadPickerResponse;
 use app_lib::config::AppConfig;
 use mockito::{Matcher, Server};
-// 简化导入，因为我们已经不再需要这些类型了
-use std::time::Duration;
 
 // 测试Download方法
 #[test]
@@ -153,7 +152,7 @@ fn test_upload_file_successful() {
         rt.block_on(async {
             // 执行上传
             let result = api_client
-                .upload_file(
+                .upload_file::<UploadPickerResponse>(
                     "/api/pickers",
                     "test-picker",
                     "A test picker",
@@ -203,7 +202,7 @@ fn test_upload_file_without_image() {
         rt.block_on(async {
             // 执行上传
             let result = api_client
-                .upload_file(
+                .upload_file::<UploadPickerResponse>(
                     "/api/pickers",
                     "test-picker",
                     "A test picker",
@@ -252,7 +251,7 @@ fn test_upload_file_server_error() {
         rt.block_on(async {
             // 执行上传
             let result = api_client
-                .upload_file(
+                .upload_file::<UploadPickerResponse>(
                     "/api/pickers",
                     "test-picker",
                     "A test picker",
@@ -306,7 +305,7 @@ fn test_upload_file_timeout_retry() {
         rt.block_on(async {
             // 执行上传，应该会重试
             let _ = api_client
-                .upload_file(
+                .upload_file::<UploadPickerResponse>(
                     "/api/pickers",
                     "test-picker",
                     "A test picker",
