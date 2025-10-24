@@ -30,10 +30,22 @@ export interface ChatMessage {
   message_type: string;
 }
 
+export interface BlockchainParams {
+  wallet_private_key?: string;
+  rpc_url?: string;
+  explorer_url?: string;
+  token_usdt_url?: string;
+  usdt_contract_address?: string;
+  meson_contract_address?: string;
+  erc20_factory_address?: string;
+  erc721_factory_address?: string;
+}
+
 export interface SaveParametersRequest {
   ai_api_url?: string;
   ai_api_key?: string;
   ai_model?: string;
+  blockchain_params?: BlockchainParams;
 }
 
 /**

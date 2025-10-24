@@ -87,7 +87,7 @@ pub async fn get_wallet_balance(address: Address, chain_url: String) -> Result<i
     let balance = provider
         .get_balance(address)
         .await
-        .map_err(|e| format!("Failed to get wallet balance: {}", e))?;
+        .map_err(|e| format!("Failed to get wallet balance in Desktop, Chain URL: {}, Error: {}, ", chain_url, e))?;
 
     // 转换为i64 - 使用TryInto特质将Uint<256,4>转换为i64
     // 先除以10^9得到gwei单位，避免可能的溢出
@@ -116,7 +116,7 @@ pub async fn get_max_transferable_balance(address: Address, chain_url: String) -
     let balance = provider
         .get_balance(address)
         .await
-        .map_err(|e| format!("Failed to get wallet balance: {}", e))?;
+        .map_err(|e| format!("Failed to get wallet balance in Desktop: {}", e))?;
 
     // 计算Gas费用 (21000 gas limit * 20 gwei gas price)
     let gas_price = Uint::from(20u64) * Uint::from(1e9 as u64); // 20 gwei in wei

@@ -8,7 +8,7 @@ use log::info;
 pub struct BlockchainConfig {
     pub rpc_url: String,
     pub explorer_url: String,
-    pub wallet_private: String,
+    pub wallet_private_key: String,
     pub token_usdt_url: String,
     pub usdt_contract_address: String,
     pub meson_contract_address: String,

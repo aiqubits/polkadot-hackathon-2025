@@ -65,7 +65,8 @@ https://github.com/conflux-fans/summerhackfest-2025/tree/main/projects/picker
 - 2025-10-07: Impl AI api settings and chatbot task manager.
 - 2025-10-11: Impl blockchain capability mcp server.
 - 2025-10-20: Add Readme, Dos, PPT for Polka.
-- 2025-10-24: Redefine the data types of custom contracts on-chain, and solidity contract tests, nodejs contract tests.
+- 2025-10-23: Redefine the data types of custom contracts on-chain, and solidity contract tests, nodejs contract tests.
+- 2025-10-24: Add api settings for Desktop Chatbot blockchain and other related optimizations.
 - 2025-10-25: Complete local validation testing of Polka Revm integration.
 
 # Team info
@@ -165,7 +166,7 @@ ai_model = "deepseek-chat"
 [blockchain]
 rpc_url = "https://sepolia.infura.io/v3/xxx"
 explorer_url = "https://sepolia.etherscan.io"
-wallet_private = ""
+wallet_private_key = ""
 token_usdt_url = "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT"
 # sepolia cross chain pay
 usdt_contract_address = "0xd53e9530107a8d8856099d7d80126478d48e06dA"

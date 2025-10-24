@@ -57,7 +57,7 @@ impl Tool for CreateERC20TokenTool {
                 .context("Invalid initial holder address format")?;
 
             // 解析私钥
-            let signer: PrivateKeySigner = config.wallet_private.parse()
+            let signer: PrivateKeySigner = config.wallet_private_key.parse()
                 .map_err(|e| {
                     error!("Invalid private key format: {}", e);
                     anyhow::anyhow!("Invalid private key format: {}", e)

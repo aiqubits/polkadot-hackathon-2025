@@ -536,12 +536,25 @@ pub async fn get_chat_session(state: State<'_, Arc<Mutex<ChatbotState>>>, sessio
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlockchainParams {
+    pub wallet_private_key: Option<String>,
+    pub rpc_url: Option<String>,
+    pub explorer_url: Option<String>,
+    pub token_usdt_url: Option<String>,
+    pub usdt_contract_address: Option<String>,
+    pub meson_contract_address: Option<String>,
+    pub erc20_factory_address: Option<String>,
+    pub erc721_factory_address: Option<String>,
+}
+
 // 定义保存参数请求结构体
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SaveParametersRequest {
     pub ai_api_url: Option<String>,
     pub ai_api_key: Option<String>,
     pub ai_model: Option<String>,
+    pub blockchain_params: Option<BlockchainParams>,
 }
 
 // 实现 Tauri 命令：保存参数到文件
@@ -563,6 +576,34 @@ pub async fn save_parameters_to_file(request: SaveParametersRequest) -> Result<(
     if let Some(ai_model) = request.ai_model {
         config.ai_model = ai_model;
     }
+
+    if let Some(blockchain_params) = request.blockchain_params {
+        if let Some(wallet_private_key) = blockchain_params.wallet_private_key {
+            config.blockchain.wallet_private_key = wallet_private_key;
+        }
+        if let Some(rpc_url) = blockchain_params.rpc_url {
+            config.blockchain.rpc_url = rpc_url;
+        }
+        if let Some(explorer_url) = blockchain_params.explorer_url {
+            config.blockchain.explorer_url = explorer_url;
+        }
+        if let Some(token_usdt_url) = blockchain_params.token_usdt_url {
+            config.blockchain.token_usdt_url = token_usdt_url;
+        }
+        if let Some(usdt_contract_address) = blockchain_params.usdt_contract_address {
+            config.blockchain.usdt_contract_address = usdt_contract_address;
+        }
+        if let Some(meson_contract_address) = blockchain_params.meson_contract_address {
+            config.blockchain.meson_contract_address = meson_contract_address;
+        }
+        if let Some(erc20_factory_address) = blockchain_params.erc20_factory_address {
+            config.blockchain.erc20_factory_address = erc20_factory_address;
+        }
+        if let Some(erc721_factory_address) = blockchain_params.erc721_factory_address {
+            config.blockchain.erc721_factory_address = erc721_factory_address;
+        }
+    }
+    
     // 保存更新后的配置
     config.save().map_err(|e| e.to_string())?;
     

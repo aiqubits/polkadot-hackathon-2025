@@ -42,7 +42,7 @@ The configuration file is located at `./.picker-desktop/config.toml`:
 [blockchain]
 rpc_url = "https://sepolia.infura.io/v3/YOUR_PROJECT_ID"
 explorer_url = "https://sepolia.etherscan.io"
-wallet_private = "YOUR_PRIVATE_KEY"
+wallet_private_key = "YOUR_PRIVATE_KEY"
 token_usdt_url = "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT"
 usdt_contract_address = "USDT_CONTRACT_ADDRESS"
 meson_contract_address = "MESON_CONTRACT_ADDRESS"

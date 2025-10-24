@@ -14,6 +14,19 @@ pub struct AppConfig {
     pub ai_api_url: String,
     pub ai_api_key: String,
     pub ai_model: String,
+    pub blockchain: BlockchainParams,
+}
+
+#[derive(Debug, Deserialize, Default, Clone)]
+pub struct BlockchainParams {
+    pub wallet_private_key: String,
+    pub rpc_url: String,
+    pub explorer_url: String,
+    pub token_usdt_url: String,
+    pub usdt_contract_address: String,
+    pub meson_contract_address: String,
+    pub erc20_factory_address: String,
+    pub erc721_factory_address: String,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -52,7 +65,16 @@ impl AppConfig {
             .set_default("max_retries", 3)?
             .set_default("ai_api_url", "https://api.openai.com/v1")?
             .set_default("ai_api_key", "sk-00000000000000000000000000000000")?
-            .set_default("ai_model", "gpt-3.5-turbo")?
+            .set_default("ai_model", "gpt-4o")?
+            .set_default("blockchain.wallet_private_key", "0000000000000000000000000000000000000000000000000000000000000000")?
+            .set_default("blockchain.rpc_url", "https://sepolia.infura.io/v3/xxxxxxxxx")?
+            .set_default("blockchain.explorer_url", "https://sepolia.etherscan.io")?
+            .set_default("blockchain.token_usdt_url", "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT")?
+            .set_default("blockchain.usdt_contract_address", "0xd53e9530107a8d8856099d7d80126478d48e06dA")?
+            .set_default("blockchain.meson_contract_address", "0x0d12d15b26a32e72A3330B2ac9016A22b1410CB6")?
+            .set_default("blockchain.erc20_factory_address", "0x9712C7792fF62373f4ddBeE53DBf9BeCB63D80dB")?
+            .set_default("blockchain.erc721_factory_address", "0xDc49Fe683D54Ee2E37459b4615DebA8dbee3cB9A")?
+
             // 添加配置文件（如果存在）
             .add_source(ConfigFile::from(config_file).required(false))
             // 添加环境变量
@@ -69,6 +91,16 @@ impl AppConfig {
             ai_api_url: config.get_string("ai_api_url").unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
             ai_api_key: config.get_string("ai_api_key").unwrap_or_else(|_| "sk-00000000000000000000000000000000".to_string()),
             ai_model: config.get_string("ai_model").unwrap_or_else(|_| "gpt-3.5-turbo".to_string()),
+            blockchain: BlockchainParams {
+                wallet_private_key: config.get_string("blockchain.wallet_private_key").unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+                rpc_url: config.get_string("blockchain.rpc_url").unwrap_or_else(|_| "https://sepolia.infura.io/v3/xxxxxxxxx".to_string()),
+                explorer_url: config.get_string("blockchain.explorer_url").unwrap_or_else(|_| "https://sepolia.etherscan.io".to_string()),
+                token_usdt_url: config.get_string("blockchain.token_usdt_url").unwrap_or_else(|_| "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT".to_string()),
+                usdt_contract_address: config.get_string("blockchain.usdt_contract_address").unwrap_or_else(|_| "0xd53e9530107a8d8856099d7d80126478d48e06dA".to_string()),
+                meson_contract_address: config.get_string("blockchain.meson_contract_address").unwrap_or_else(|_| "0x0d12d15b26a32e72A3330B2ac9016A22b1410CB6".to_string()),
+                erc20_factory_address: config.get_string("blockchain.erc20_factory_address").unwrap_or_else(|_| "0x9712C7792fF62373f4ddBeE53DBf9BeCB63D80dB".to_string()),
+                erc721_factory_address: config.get_string("blockchain.erc721_factory_address").unwrap_or_else(|_| "0xDc49Fe683D54Ee2E37459b4615DebA8dbee3cB9A".to_string()),
+            }
         })
     }
     
@@ -81,6 +113,16 @@ impl AppConfig {
             ai_api_url: "https://api.openai.com/v1".to_string(),
             ai_api_key: "sk-00000000000000000000000000000000".to_string(),
             ai_model: "gpt-3.5-turbo".to_string(),
+            blockchain: BlockchainParams {
+                wallet_private_key: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+                rpc_url: "https://sepolia.infura.io/v3/xxxxxxxxx".to_string(),
+                explorer_url: "https://sepolia.etherscan.io".to_string(),
+                token_usdt_url: "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT".to_string(),
+                usdt_contract_address: "0xd53e9530107a8d8856099d7d80126478d48e06dA".to_string(),
+                meson_contract_address: "0x0d12d15b26a32e72A3330B2ac9016A22b1410CB6".to_string(),
+                erc20_factory_address: "0x9712C7792fF62373f4ddBeE53DBf9BeCB63D80dB".to_string(),
+                erc721_factory_address: "0xDc49Fe683D54Ee2E37459b4615DebA8dbee3cB9A".to_string(),
+            }
         }
     }
 
@@ -96,13 +138,21 @@ impl AppConfig {
         
         // 创建TOML格式的内容
         let content = format!(
-            "api_base_url = \"{}\"\nrequest_timeout_ms = {}\nmax_retries = {}\nai_api_url = \"{}\"\nai_api_key = \"{}\"\nai_model = \"{}\"\n",
+            "api_base_url = \"{}\"\nrequest_timeout_ms = {}\nmax_retries = {}\nai_api_url = \"{}\"\nai_api_key = \"{}\"\nai_model = \"{}\"\n[blockchain]\nwallet_private_key = \"{}\"\nrpc_url = \"{}\"\nexplorer_url = \"{}\"\ntoken_usdt_url = \"{}\"\nusdt_contract_address = \"{}\"\nmeson_contract_address = \"{}\"\nerc20_factory_address = \"{}\"\nerc721_factory_address = \"{}\"\n",
             self.api_base_url,
             self.request_timeout_ms,
             self.max_retries,
             self.ai_api_url,
             self.ai_api_key,
-            self.ai_model
+            self.ai_model,
+            self.blockchain.wallet_private_key,
+            self.blockchain.rpc_url,
+            self.blockchain.explorer_url,
+            self.blockchain.token_usdt_url,
+            self.blockchain.usdt_contract_address,
+            self.blockchain.meson_contract_address,
+            self.blockchain.erc20_factory_address,
+            self.blockchain.erc721_factory_address,
         );
         
         // 写入文件

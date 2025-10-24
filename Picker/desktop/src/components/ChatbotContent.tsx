@@ -31,7 +31,17 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
   const [apiSettings, setApiSettings] = useState({
     url: '',
     key: '',
-    model: ''
+    model: '',
+    blockchain_params: {
+      wallet_private_key: '',
+      rpc_url: '',
+      explorer_url: '',
+      token_usdt_url: '',
+      usdt_contract_address: '',
+      meson_contract_address: '',
+      erc20_factory_address: '',
+      erc721_factory_address: '',
+    }
   });
 
   // 保存状态到localStorage
@@ -227,7 +237,17 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
         setApiSettings({
           url: '',
           key: '',
-          model: ''
+          model: '',
+          blockchain_params: {
+            wallet_private_key: '',
+            rpc_url: '',
+            explorer_url: '',
+            token_usdt_url: '',
+            usdt_contract_address: '',
+            meson_contract_address: '',
+            erc20_factory_address: '',
+            erc721_factory_address: '',
+          }
         });
       }
     } else {
@@ -235,7 +255,17 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
       setApiSettings({
         url: '',
         key: '',
-        model: ''
+        model: '',
+        blockchain_params: {
+          wallet_private_key: '',
+          rpc_url: '',
+          explorer_url: '',
+          token_usdt_url: '',
+          usdt_contract_address: '',
+          meson_contract_address: '',
+          erc20_factory_address: '',
+          erc721_factory_address: '',
+        }
       });
     }
     setDialogVisible(true);
@@ -249,13 +279,56 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
   // 保存API设置
   const saveApiSettings = async () => {
     try {
-      await chatbotApi.saveParametersToFile(
-        {
-          ai_api_url: apiSettings.url,
-          ai_api_key: apiSettings.key,
-          ai_model: apiSettings.model,
-        }
-      );
+      // 构建过滤后的区块链参数对象，只包含非空值的字段
+      const filteredBlockchainParams: Record<string, string> = {};
+      
+      // 检查每个区块链参数字段并添加非空值
+      const { blockchain_params } = apiSettings;
+      if (blockchain_params.wallet_private_key) {
+        filteredBlockchainParams.wallet_private_key = blockchain_params.wallet_private_key;
+      }
+      if (blockchain_params.rpc_url) {
+        filteredBlockchainParams.rpc_url = blockchain_params.rpc_url;
+      }
+      if (blockchain_params.explorer_url) {
+        filteredBlockchainParams.explorer_url = blockchain_params.explorer_url;
+      }
+      if (blockchain_params.token_usdt_url) {
+        filteredBlockchainParams.token_usdt_url = blockchain_params.token_usdt_url;
+      }
+      if (blockchain_params.usdt_contract_address) {
+        filteredBlockchainParams.usdt_contract_address = blockchain_params.usdt_contract_address;
+      }
+      if (blockchain_params.meson_contract_address) {
+        filteredBlockchainParams.meson_contract_address = blockchain_params.meson_contract_address;
+      }
+      if (blockchain_params.erc20_factory_address) {
+        filteredBlockchainParams.erc20_factory_address = blockchain_params.erc20_factory_address;
+      }
+      if (blockchain_params.erc721_factory_address) {
+        filteredBlockchainParams.erc721_factory_address = blockchain_params.erc721_factory_address;
+      }
+      
+      // 构建最终的参数对象，只包含非空的顶级字段
+      const params: Record<string, string | Record<string, string>> = {};
+      
+      // 只添加非空的顶级字段
+      if (apiSettings.url) {
+        params.ai_api_url = apiSettings.url;
+      }
+      if (apiSettings.key) {
+        params.ai_api_key = apiSettings.key;
+      }
+      if (apiSettings.model) {
+        params.ai_model = apiSettings.model;
+      }
+      
+      // 只有当有非空的区块链参数时才添加该字段
+      if (Object.keys(filteredBlockchainParams).length > 0) {
+        params.blockchain_params = filteredBlockchainParams;
+      }
+      
+      await chatbotApi.saveParametersToFile(params);
     } catch (error) {
       console.error('Failed to save API settings:', error);
       setError('Failed to save API settings');
@@ -691,6 +764,36 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
                     placeholder="gpt-3.5-turbo"
                   />
                 </div>
+                <div className="form-group">
+                  <label>Wallet Private Key</label>
+                  <input
+                    type="password"
+                    className="form-input"
+                    value={apiSettings.blockchain_params.wallet_private_key}
+                    onChange={(e) => setApiSettings({...apiSettings, blockchain_params: {...apiSettings.blockchain_params, wallet_private_key: e.target.value}})}
+                    placeholder="123456789ec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>RPC URL</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={apiSettings.blockchain_params.rpc_url}
+                    onChange={(e) => setApiSettings({...apiSettings, blockchain_params: {...apiSettings.blockchain_params, rpc_url: e.target.value}})}
+                    placeholder="https://sepolia.infura.io/v3/xxxxxxxxx"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Explorer URL</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={apiSettings.blockchain_params.explorer_url}
+                    onChange={(e) => setApiSettings({...apiSettings, blockchain_params: {...apiSettings.blockchain_params, explorer_url: e.target.value}})}
+                    placeholder="https://sepolia.etherscan.io"
+                  />
+                </div>
               </div>
             </div>
             <div className="custom-dialog-footer" style={{ justifyContent: 'right', gap: '16px' }}>
@@ -698,7 +801,7 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
               <button 
                 className="custom-dialog-button"
                 onClick={closeDialog}
-                style={{ backgroundColor: '#6b7280' }} /* 中性色 */
+                style={{ backgroundColor: '#555555' }}
               >
                 Cancel
               </button>
@@ -706,9 +809,9 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
               <button 
                 className="custom-dialog-button"
                 onClick={saveApiSettings}
-                disabled={!apiSettings.url || !apiSettings.key || !apiSettings.model}
-                style={!apiSettings.url || !apiSettings.key || !apiSettings.model ? 
-                  { backgroundColor: '#cccccc', cursor: 'not-allowed' } : {}}
+                disabled={!apiSettings.url && !apiSettings.key && !apiSettings.model && !apiSettings.blockchain_params.wallet_private_key && !apiSettings.blockchain_params.rpc_url && !apiSettings.blockchain_params.explorer_url}
+                style={!apiSettings.url && !apiSettings.key && !apiSettings.model && !apiSettings.blockchain_params.wallet_private_key && !apiSettings.blockchain_params.rpc_url && !apiSettings.blockchain_params.explorer_url ? 
+                  { backgroundColor: '#cccccc', cursor: 'not-allowed' } : {backgroundColor: '#0063b1', cursor: ''}}
               >
                 OK
               </button>

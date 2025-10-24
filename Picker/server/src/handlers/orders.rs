@@ -191,7 +191,7 @@ pub async fn create_order(
                 // 获取钱包余额
                 let balance = provider.get_balance(address).await.map_err(|e| {
                     error!("Failed to get wallet balance: {}", e);
-                    AppError::InternalServerError(format!("Failed to get wallet balance: {:?}", e))
+                    AppError::InternalServerError(format!("Failed to get wallet balance in Server: {:?}", e))
                 })?;
 
                 // 检查钱包余额是否足够支付订单金额

@@ -470,7 +470,7 @@ pub async fn replace_private_key(
     })?;
     let balance = provider.get_balance(address).await.map_err(|e| {
         error!("Failed to get wallet balance: {}", e);
-        AppError::InternalServerError(format!("Failed to get wallet balance: {:?}", e))
+        AppError::InternalServerError(format!("Failed to get wallet balance in Server: {:?}", e))
     })?;
 
     // 计算Gas费用 (21000 gas limit * 20 gwei gas price)

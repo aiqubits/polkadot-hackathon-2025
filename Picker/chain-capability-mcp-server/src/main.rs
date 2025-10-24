@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
             blockchain: config::BlockchainConfig {
                 rpc_url: "https://sepolia.infura.io/v3/xxxxxx".to_string(),
                 explorer_url: "https://sepolia.etherscan.io".to_string(),
-                wallet_private: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(), // 测试私钥
+                wallet_private_key: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".to_string(), // 测试私钥
                 token_usdt_url: "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT".to_string(),
                 // cross chain pay
                 usdt_contract_address: "0xd53e9530107a8d8856099d7d80126478d48e06dA".to_string(),
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     let blockchain_config = BlockchainConfig {
         rpc_url: config.blockchain.rpc_url,
         explorer_url: config.blockchain.explorer_url,
-        wallet_private: config.blockchain.wallet_private,
+        wallet_private_key: config.blockchain.wallet_private_key,
         token_usdt_url: config.blockchain.token_usdt_url,
         usdt_contract_address: config.blockchain.usdt_contract_address,
         meson_contract_address: config.blockchain.meson_contract_address,
