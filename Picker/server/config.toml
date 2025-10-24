@@ -15,10 +15,10 @@ cleanup_minutes = 10
 # 区块链配置
 [blockchain]
 name = "ETH"
-rpc_url = "https://sepolia.infura.io/v3/xxxxxx"
+rpc_url = "https://sepolia.infura.io/v3/xxxxx"
 explorer_url = "https://sepolia.etherscan.io"
 token_usdt_url = "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT"
-authorized_contract_address = "0x1B0b2ef32Eba0Aa15B123633e2145D708eD2C5E9"
+authorized_contract_address = "0x83B24dC9d42080Cd3Bf3232d0DCC2D30c342E60C"
 retry_times = 5
 retry_interval_seconds = 10 
 

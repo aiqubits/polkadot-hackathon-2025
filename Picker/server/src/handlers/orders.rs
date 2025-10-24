@@ -17,6 +17,8 @@ use uuid::Uuid;
 use crate::config::AppState;
 use crate::models::{DownloadToken, Order, OrderStatus, PayType, Picker, User};
 use crate::utils::{decrypt_private_key, AppError};
+use zerocopy::IntoBytes;
+
 use alloy::primitives::Address;
 use alloy::primitives::{FixedBytes, U256};
 use alloy::rpc::types::TransactionReceipt;
@@ -258,7 +260,7 @@ pub async fn create_order(
         sol! {
             #[sol(rpc)]
             contract PickerPayment {
-                function pay(bytes16 pickerId, bytes16 devUserId, address devWalletAddress) external payable;
+                function pay(bytes32 pickerId, bytes32 devUserId, address devWalletAddress) external payable;
             }
         }
 
@@ -293,12 +295,16 @@ pub async fn create_order(
                 })?,
             );
 
-            // 准备参数
-            let picker_id_bytes = payload.picker_id.as_bytes();
-            let dev_user_id_bytes = dev_user.user_id.as_bytes();
+            // 裁剪字符串，移除横线
+            let picker_id_str = payload.picker_id.to_string().replace("-", "");
+            let dev_user_id_str = dev_user.user_id.to_string().replace("-", "");
 
-            let picker_id_fixed = FixedBytes::from_slice(&picker_id_bytes[0..16]);
-            let dev_user_id_fixed = FixedBytes::from_slice(&dev_user_id_bytes[0..16]);
+            // 准备参数
+            let picker_id_bytes = picker_id_str.as_bytes();
+            let dev_user_id_bytes = dev_user_id_str.as_bytes();
+
+            let picker_id_fixed = FixedBytes::from_slice(&picker_id_bytes[0..32]);
+            let dev_user_id_fixed = FixedBytes::from_slice(&dev_user_id_bytes[0..32]);
 
             let dev_wallet = dev_user.wallet_address.parse::<Address>().map_err(|e| {
                 tracing::error!("Invalid developer wallet address: {}", e);

@@ -262,7 +262,7 @@ pub async fn get_market(
     // 构建查询条件和获取数据
     let (pickers, total) = if let Some(keyword) = &query.keyword {
         let search_pattern = format!("%{}%", keyword);
-        
+
         // 获取总数
         let total: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) as count FROM pickers WHERE status = 'active' AND (alias LIKE ? OR description LIKE ?)"

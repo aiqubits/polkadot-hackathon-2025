@@ -8,10 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::config::AppState;
 use crate::utils::AppError;
 use hex;
-use std::str::FromStr;
+use zerocopy::IntoBytes;
 
-use alloy::primitives::{Address, U256};
-use alloy::providers::{Provider, ProviderBuilder};
+use alloy::primitives::{Address, FixedBytes};
+use alloy::providers::ProviderBuilder;
 use utoipa::ToSchema;
 
 #[derive(Deserialize)]
@@ -70,7 +70,7 @@ pub async fn is_picker_operator(
         .blockchain_authorized_contract_address
         .parse()
         .map_err(|e| AppError::InternalServerError(format!("Failed to parse contract address: {:?}", e)))?;
-    println!("contract_address = {:?}", contract_address);
+
     // 创建合约实例
     let contract = PickerPayment::new(contract_address, provider);
 
@@ -80,7 +80,7 @@ pub async fn is_picker_operator(
         .call()
         .await
         .map_err(|e| AppError::InternalServerError(format!("Failed to call isOperator: {:?}", e)))?;
-    println!("isOperator({:?}) = {:?}", address, is_operator);
+
     Ok(axum::Json(IsOperatorResponse { is_operator }))
 }
 
@@ -136,7 +136,7 @@ pub async fn query_picker_by_wallet(
     alloy::sol! {
         #[sol(rpc)]
         contract PickerPayment {
-            function queryPickerByWallet(address wallet) external view returns (bytes16, bytes16);
+            function queryPickerByWallet(address wallet) external view returns (bytes32, bytes32);
         }
     }
 
@@ -171,10 +171,23 @@ pub async fn query_picker_by_wallet(
             dev_user_id: None,
         }
     } else {
-        // 找到了picker信息
+        // 找到了 picker 信息
+        // 将 32 字节的FixedBytes转换回原始字符串
+        // 从注释中可以看到原始字符串是如何转换为 32 字节的，现在实现反向操作
+        let picker_id_bytes = result._0.as_bytes();
+        let dev_user_id_bytes = result._1.as_bytes();
+        
+        // 使用from_utf8_lossy将字节数组转换为字符串，并去除末尾的零字节
+        let picker_id_str = String::from_utf8_lossy(picker_id_bytes)
+            .trim_end_matches(char::from(0))
+            .to_string();
+        let dev_user_id_str = String::from_utf8_lossy(dev_user_id_bytes)
+            .trim_end_matches(char::from(0))
+            .to_string();
+
         QueryPickerByWalletResponse {
-            picker_id: Some(format!("0x{:x}", result._0)),
-            dev_user_id: Some(format!("0x{:x}", result._1)),
+            picker_id: Some(picker_id_str),
+            dev_user_id: Some(dev_user_id_str),
         }
     };
 
@@ -209,7 +222,7 @@ pub async fn register_picker(
     alloy::sol! {
         #[sol(rpc)]
         contract PickerPayment {
-            function registerPicker(bytes16 pickerId, bytes16 devUserId, address devWalletAddress) external;
+            function registerPicker(bytes32 pickerId, bytes32 devUserId, address devWalletAddress) external;
         }
     }
 
@@ -273,8 +286,8 @@ pub async fn register_picker(
     let picker_id_bytes = payload.picker_id.as_bytes();
     let dev_user_id_bytes = payload.dev_user_id.as_bytes();
 
-    let picker_id_fixed = alloy::primitives::FixedBytes::from_slice(&picker_id_bytes[0..16]);
-    let dev_user_id_fixed = alloy::primitives::FixedBytes::from_slice(&dev_user_id_bytes[0..16]);
+    let picker_id_fixed = FixedBytes::from_slice(&picker_id_bytes[0..32]);
+    let dev_user_id_fixed = FixedBytes::from_slice(&dev_user_id_bytes[0..32]);
 
     let dev_wallet = payload.dev_wallet_address.parse::<Address>().map_err(|e| {
         tracing::error!("Invalid developer wallet address: {}", e);
@@ -358,7 +371,7 @@ pub async fn remove_picker(
     alloy::sol! {
         #[sol(rpc)]
         contract PickerPayment {
-            function removePicker(bytes16 pickerId) external;
+            function removePicker(bytes32 pickerId) external;
         }
     }
 
@@ -406,7 +419,7 @@ pub async fn remove_picker(
 
     // 准备参数
     let picker_id_bytes = payload.picker_id.as_bytes();
-    let picker_id_fixed = alloy::primitives::FixedBytes::from_slice(&picker_id_bytes[0..16]);
+    let picker_id_fixed = FixedBytes::from_slice(&picker_id_bytes[0..32]);
 
     // 配置合约地址
     let contract_address = state
@@ -461,8 +474,8 @@ pub async fn get_all_pickers(
         #[sol(rpc)]
         contract PickerPayment {
             struct Picker {
-                bytes16 pickerId;
-                bytes16 devUserId;
+                bytes32 pickerId;
+                bytes32 devUserId;
                 address devWalletAddress;
             }
             

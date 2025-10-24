@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { network } from "hardhat";
 
-// 模拟bytes16类型数据的辅助函数
-function toBytes16(str: string): `0x${string}` {
+// 确保生成正确的bytes32类型数据的辅助函数
+function toBytes32(str: string): `0x${string}` {
   const hex = Buffer.from(str).toString('hex');
-  return `0x${hex.padEnd(32, '0')}`;
+  // 确保生成64个十六进制字符（32字节）
+  return `0x${hex.padEnd(64, '0')}`;
 }
 
 test.describe("PickerPayment", function () {
@@ -24,10 +25,10 @@ test.describe("PickerPayment", function () {
   });
   
   // 测试数据
-  const pickerId = toBytes16("test-picker-1");
-  const devUserId = toBytes16("dev-user-1");
-  const pickerId2 = toBytes16("test-picker-2");
-  const devUserId2 = toBytes16("dev-user-2");
+  const pickerId = toBytes32("test-picker-1");
+  const devUserId = toBytes32("dev-user-1");
+  const pickerId2 = toBytes32("test-picker-2");
+  const devUserId2 = toBytes32("dev-user-2");
   
   let pickerPayment: any;
 
@@ -152,7 +153,7 @@ test.describe("PickerPayment", function () {
       
       // 验证Picker是否已删除
       const [queriedPickerId] = await pickerPayment.read.queryPickerByWallet([userWallet.account.address]);
-      assert.deepEqual(queriedPickerId, "0x00000000000000000000000000000000");
+      assert.deepEqual(queriedPickerId, "0x0000000000000000000000000000000000000000000000000000000000000000");
     });
   });
 
@@ -170,7 +171,7 @@ test.describe("PickerPayment", function () {
       
       // 验证Picker是否已删除
       const [queriedPickerId] = await pickerPayment.read.queryPickerByWallet([deployerWallet.account.address]);
-      assert.deepEqual(queriedPickerId, "0x00000000000000000000000000000000");
+      assert.deepEqual(queriedPickerId, "0x0000000000000000000000000000000000000000000000000000000000000000");
     });
 
     test.it("应该能够查询所有Picker列表", async function () {

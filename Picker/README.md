@@ -60,11 +60,13 @@ https://github.com/conflux-fans/summerhackfest-2025/tree/main/projects/picker
 
 ## Schedule
 
-### timeline for all activities of your project during Hackathon
-
-### important milestone like first submit, pre-demo, testnet
-
-### completed features, tests, docs or in production
+- 2025-09-30: First v0.0.1 version Project creation, Only implement the simplest process, without including complete and innovative feature implementation.
+- 2025-10-06: Fix desktop sidebar navigation and others.
+- 2025-10-07: Impl AI api settings and chatbot task manager.
+- 2025-10-11: Impl blockchain capability mcp server.
+- 2025-10-20: Add Readme, Dos, PPT for Polka.
+- 2025-10-24: Redefine the data types of custom contracts on-chain, and solidity contract tests, nodejs contract tests.
+- 2025-10-25: Complete local validation testing of Polka Revm integration.
 
 # Team info
 

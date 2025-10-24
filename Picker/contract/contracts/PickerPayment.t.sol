@@ -14,10 +14,10 @@ contract PickerPaymentTest is Test {
     address public devWallet1;
     address public devWallet2;
     
-    bytes16 public pickerId1 = bytes16("picker1");
-    bytes16 public pickerId2 = bytes16("picker2");
-    bytes16 public devUserId1 = bytes16("dev1");
-    bytes16 public devUserId2 = bytes16("dev2");
+    bytes32 public pickerId1 = bytes32("picker1");
+    bytes32 public pickerId2 = bytes32("picker2");
+    bytes32 public devUserId1 = bytes32("dev1");
+    bytes32 public devUserId2 = bytes32("dev2");
     
     // 添加receive函数以接收以太币
     receive() external payable {}
@@ -78,7 +78,7 @@ contract PickerPaymentTest is Test {
         pickerPayment.registerPicker(pickerId1, devUserId1, devWallet1);
         
         // 验证Picker信息
-        (bytes16 queriedPickerId, bytes16 queriedDevUserId) = pickerPayment.queryPickerByWallet(devWallet1);
+        (bytes32 queriedPickerId, bytes32 queriedDevUserId) = pickerPayment.queryPickerByWallet(devWallet1);
         assertTrue(queriedPickerId == pickerId1, "Picker ID should match");
         assertTrue(queriedDevUserId == devUserId1, "Developer User ID should match");
     }
@@ -89,7 +89,7 @@ contract PickerPaymentTest is Test {
         pickerPayment.registerPicker(pickerId1, devUserId1, devWallet1);
         
         // 验证Picker信息
-        (bytes16 queriedPickerId, bytes16 queriedDevUserId) = pickerPayment.queryPickerByWallet(devWallet1);
+        (bytes32 queriedPickerId, bytes32 queriedDevUserId) = pickerPayment.queryPickerByWallet(devWallet1);
         assertTrue(queriedPickerId == pickerId1, "Picker ID should match");
         assertTrue(queriedDevUserId == devUserId1, "Developer User ID should match");
     }
@@ -114,8 +114,8 @@ contract PickerPaymentTest is Test {
         pickerPayment.registerPicker(pickerId1, devUserId1, devWallet1);
         pickerPayment.removePicker(pickerId1);
         
-        (bytes16 queriedPickerId, ) = pickerPayment.queryPickerByWallet(devWallet1);
-        assertTrue(queriedPickerId == bytes16(0), "Picker should be removed");
+        (bytes32 queriedPickerId, ) = pickerPayment.queryPickerByWallet(devWallet1);
+        assertTrue(queriedPickerId == bytes32(0), "Picker should be removed");
     }
 
     // 测试支付功能
@@ -145,7 +145,7 @@ contract PickerPaymentTest is Test {
 
     // 测试向不存在的Picker支付
     function test_PayToNonExistentPicker() public {
-        bytes16 nonExistentPickerId = bytes16("nonExistent");
+        bytes32 nonExistentPickerId = bytes32("nonExistent");
         
         vm.deal(nonOperator, 100 ether);
         vm.prank(nonOperator);

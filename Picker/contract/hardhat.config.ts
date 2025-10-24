@@ -1,10 +1,10 @@
 import type { HardhatUserConfig } from "hardhat/config";
-import hardhatVerify from "@nomicfoundation/hardhat-verify";
+import hardhatVerifyPlugin from "@nomicfoundation/hardhat-verify";
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable } from "hardhat/config";
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxViemPlugin, hardhatVerify],
+  plugins: [hardhatToolboxViemPlugin, hardhatVerifyPlugin],
   solidity: {
         version: "0.8.28",
         settings: {
@@ -30,19 +30,19 @@ const config: HardhatUserConfig = {
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
   },
-  // chainDescriptors: {
-  //   11155111: {
-  //     name: "Sepolia",
-  //     chainType: "l1",
-  //     blockExplorers: {
-  //       etherscan: {
-  //         name: "Sepolia Explorer",
-  //         url: "https://sepolia.etherscan.io/",
-  //         apiUrl: "https://api-sepolia.etherscan.io/api",
-  //       },
-  //     },
-  //   },
-  // },
+  chainDescriptors: {
+    11155111: {
+      name: "Sepolia",
+      chainType: "l1",
+      blockExplorers: {
+        etherscan: {
+          name: "Sepolia Explorer",
+          url: "https://sepolia.etherscan.io/",
+          apiUrl: "https://api.etherscan.io/v2/api",
+        },
+      },
+    },
+  },
   verify:{
     etherscan: {
       apiKey: configVariable("ETHERSCAN_API_KEY"),

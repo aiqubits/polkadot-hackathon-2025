@@ -21,21 +21,21 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
 
     // Picker数据结构
     struct Picker {
-        bytes16 pickerId;
-        bytes16 devUserId;
+        bytes32 pickerId;
+        bytes32 devUserId;
         address devWalletAddress;
     }
 
     // 数据存储
-    mapping(bytes16 => Picker) public pickers; // pickerId => Picker
-    mapping(address => bytes16) public walletToPickerId; // 快速根据钱包查PickerId
+    mapping(bytes32 => Picker) public pickers; // pickerId => Picker
+    mapping(address => bytes32) public walletToPickerId; // 快速根据钱包查PickerId
     EnumerableSet.AddressSet private operatorAddresses; // 操作员地址集合（需迭代）
-    bytes16[] private allPickerIds; // 使用数组存储所有pickerId用于迭代
+    bytes32[] private allPickerIds; // 使用数组存储所有pickerId用于迭代
 
     // 事件定义
-    event PickerRegistered(bytes16 indexed pickerId, address indexed wallet);
-    event PickerRemoved(bytes16 indexed pickerId);
-    event PaymentProcessed(bytes16 indexed pickerId, uint256 amount);
+    event PickerRegistered(bytes32 indexed pickerId, address indexed wallet);
+    event PickerRemoved(bytes32 indexed pickerId);
+    event PaymentProcessed(bytes32 indexed pickerId, uint256 amount);
     event FundsWithdrawn(address indexed deployer, uint256 amount);
     event OperatorAdded(address indexed operator);
     event OperatorRemoved(address indexed operator);
@@ -87,8 +87,8 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
      * 操作员（OPERATOR_ROLE）和合约发行者（DEFAULT_ADMIN_ROLE）可以调用
      */
     function registerPicker(
-        bytes16 pickerId,
-        bytes16 devUserId,
+        bytes32 pickerId,
+        bytes32 devUserId,
         address devWalletAddress
     ) external {
         // 检查调用者权限：操作员或合约发行者
@@ -97,9 +97,9 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
         
         // 参数验证
         if (devWalletAddress == address(0)) revert ZeroAddressNotAllowed();
-        if (pickerId == bytes16(0) || devUserId == bytes16(0)) revert InvalidPickerData();
-        if (pickers[pickerId].pickerId != bytes16(0)) revert PickerAlreadyExists();
-        if (walletToPickerId[devWalletAddress] != bytes16(0)) revert PickerAlreadyExists();
+        if (pickerId == bytes32(0) || devUserId == bytes32(0)) revert InvalidPickerData();
+        if (pickers[pickerId].pickerId != bytes32(0)) revert PickerAlreadyExists();
+        if (walletToPickerId[devWalletAddress] != bytes32(0)) revert PickerAlreadyExists();
 
         // 存储数据
         pickers[pickerId] = Picker({
@@ -117,13 +117,13 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
      * @dev 删除Picker信息
      * 操作员（OPERATOR_ROLE）和合约发行者（DEFAULT_ADMIN_ROLE）可以调用
      */
-    function removePicker(bytes16 pickerId) external {
+    function removePicker(bytes32 pickerId) external {
         // 检查调用者权限：操作员或合约发行者
         require(hasRole(OPERATOR_ROLE, _msgSender()) || hasRole(DEFAULT_ADMIN_ROLE, _msgSender()),
                 "Caller is not an operator or contract deployer");
         
         Picker storage picker = pickers[pickerId];
-        if (picker.pickerId == bytes16(0)) revert PickerNotFound();
+        if (picker.pickerId == bytes32(0)) revert PickerNotFound();
 
         // 清理映射
         delete walletToPickerId[picker.devWalletAddress];
@@ -146,13 +146,13 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
      * 按照比例剩余 5% 存储在合约中
      */
     function pay(
-        bytes16 pickerId,
-        bytes16 devUserId,
+        bytes32 pickerId,
+        bytes32 devUserId,
         address devWalletAddress
     ) external payable nonReentrant {
         // 验证Picker信息
         Picker storage picker = pickers[pickerId];
-        if (picker.pickerId == bytes16(0)) revert PickerNotFound();
+        if (picker.pickerId == bytes32(0)) revert PickerNotFound();
         if (picker.devUserId != devUserId || picker.devWalletAddress != devWalletAddress) revert InvalidPickerData();
 
         // 计算分配金额
@@ -186,10 +186,10 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
      * @dev 查询Picker信息
      * 所有人都可以根据传入的钱包地址查询Picker数据
      */
-    function queryPickerByWallet(address wallet) external view returns (bytes16, bytes16) {
-        bytes16 pickerId = walletToPickerId[wallet];
-        if (pickerId == bytes16(0)) {
-            return (bytes16(0), bytes16(0));
+    function queryPickerByWallet(address wallet) external view returns (bytes32, bytes32) {
+        bytes32 pickerId = walletToPickerId[wallet];
+        if (pickerId == bytes32(0)) {
+            return (bytes32(0), bytes32(0));
         }
         
         Picker storage picker = pickers[pickerId];
@@ -205,7 +205,7 @@ contract PickerPayment is AccessControl, ReentrancyGuard {
         Picker[] memory result = new Picker[](pickerCount);
         
         for (uint256 i = 0; i < pickerCount; i++) {
-            bytes16 pickerId = allPickerIds[i];
+            bytes32 pickerId = allPickerIds[i];
             result[i] = pickers[pickerId];
         }
         
