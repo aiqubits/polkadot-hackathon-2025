@@ -23,7 +23,7 @@ async fn main() {
     // 从环境变量获取API密钥和基本URL
     let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_else(|_| "OPENAI_API_KEY".to_string());
     let base_url = std::env::var("OPENAI_API_URL").ok();
-    let mcp_url = std::env::var("MCP_URL").unwrap_or("http://127.0.0.1:3000".to_string());  // 默认MCP服务器地址
+    let mcp_url = std::env::var("MCP_URL").unwrap_or("http://127.0.0.1:6000".to_string());  // 默认MCP服务器地址
     
     // 创建OpenAI模型实例 - 支持Openai兼容 API
     let model = OpenAIChatModel::new(api_key.clone(), base_url)

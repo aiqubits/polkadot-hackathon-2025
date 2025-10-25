@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::{Value, json};
 use chrono;
 use anyhow::Error;
-use log::{info, error};
+use log::{info, warn, error};
 use super::task::{list_tasks, run_task};
 use tauri::AppHandle;
 
@@ -357,15 +357,34 @@ async fn init_mcp_client(app_handle: AppHandle) -> Result<Arc<dyn McpClient>, Er
 
     // 打印 tool_handlers 工具处理器中的工具有哪些
     info!("Tool handlers: {:?}", mcp_client.tool_handlers.keys().collect::<Vec<_>>());
-    
-    // 连接到 MCP 服务器
-    info!("Connecting to MCP server: {}", mcp_url);
-    if let Err(e) = mcp_client.connect(&mcp_url).await {
-        let error_msg = format!("Failed to connect to MCP server at {}: {}", mcp_url, e);
-        error!("{}", error_msg);
-        // 即使连接失败，我们仍然返回客户端，因为它可以使用本地工具
-    } else {
-        info!("Successfully connected to MCP server: {}", mcp_url);
+
+    if mcp_client.is_server_connected() {
+        info!("MCP server is already connected, skipping connection");
+        return Ok(Arc::new(mcp_client));
+    }
+
+    // 在连接前先进行 ping 测试
+    info!("Pinging MCP server: {}", mcp_url);
+    match mcp_client.ping().await {
+        Ok(_) => {
+            info!("MCP server ping successful, proceeding with connection");
+            mcp_client.set_server_connected(true);
+            // 连接到 MCP 服务器
+            info!("Connecting to MCP server: {}", mcp_url);
+            if let Err(e) = mcp_client.connect(&mcp_url).await {
+                let error_msg = format!("Failed to connect to MCP server at {}: {}", mcp_url, e);
+                error!("{}", error_msg);
+                // 即使连接失败，我们仍然返回客户端，因为它可以使用本地工具
+            } else {
+                info!("Successfully connected to MCP server: {}", mcp_url);
+            }
+        }
+        Err(e) => {
+            let error_msg = format!("MCP server ping failed at {}: {}", mcp_url, e);
+            warn!("{}", error_msg);
+            // ping 失败，跳过连接步骤，直接使用本地工具
+            info!("Skipping MCP server connection due to ping failure, using local tools only");
+        }
     }
     
     // 打印 tool_handlers 工具处理器中的工具有哪些
@@ -472,7 +491,7 @@ pub struct LocalMcpTool {
 
 // Tauri命令：获取可用工具列表，匹配当前的mcp工具列表
 #[command]
-pub async fn get_available_tools(state: State<'_, Arc<Mutex<ChatbotState>>>) -> Result<Vec<LocalMcpTool>, String> {
+pub async fn get_available_tools(state: State<'_, Arc<Mutex<ChatbotState>>>) -> Result<String, String> {
     let chatbot_state = state.lock().await;
     
     // 确保MCP客户端已初始化
@@ -489,16 +508,13 @@ pub async fn get_available_tools(state: State<'_, Arc<Mutex<ChatbotState>>>) -> 
                 })
                 .collect();
                 
-            // 记录工具名称以便调试
-            let tool_names: Vec<String> = local_tools.iter().map(|t| t.name.clone()).collect();
-            log::debug!("Available tools: {:?}", tool_names);
-                
-            Ok(local_tools)
+            // 将工具列表转换为JSON字符串
+            serde_json::to_string(&local_tools).map_err(|e| e.to_string())                
         },
         Err(e) => {
-            log::error!("Failed to get tools from MCP client: {}", e);
+            error!("Failed to get tools from MCP client: {}", e);
             // 返回空列表而不是错误，这样即使MCP服务器不可用，应用也能继续工作
-            Ok(Vec::new())
+            Err(format!("Failed to get tools from MCP client: {}", e))
         }
     }
 }
@@ -610,7 +626,7 @@ pub async fn save_parameters_to_file(request: SaveParametersRequest) -> Result<(
     Ok(())
 }
 
-// Tauri命令：刷新可用工具列表，最新的mcp工具列表
+// Tauri命令：重新初始化agent，并获取最新的mcp工具列表
 #[command]
 pub async fn refresh_available_tools(state: State<'_, Arc<Mutex<ChatbotState>>>, app_handle: AppHandle) -> Result<String, String> {
     let mut chatbot_state = state.lock().await;

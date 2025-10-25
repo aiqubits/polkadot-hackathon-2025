@@ -8,6 +8,7 @@ import MainContent from './components/MainContent'
 import { clientAPI } from './client/api'
 import type { UserSystemInfoResponse, UserInfo }  from './types'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import * as chatbotApi from './client/chatBotApi';
 
 function App() {
   const [activePage, setActivePage] = useState<'home' | 'chatbot' | 'marketplace' | 'profile'>('home')
@@ -29,6 +30,7 @@ function App() {
   const [verifyCode, setVerifyCode] = useState('');
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [showLogoutMenu, setShowLogoutMenu] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false)
 
   // API调用函数
   const handleLogin = async (email: string, password: string) => {
@@ -136,6 +138,31 @@ function App() {
     checkServerStatus()
     checkLoginStatus()
   }, [])
+
+  // 初始化服务，添加useEffect钩子来初始化聊天机器人
+  useEffect(() => {
+    const initChatbot = async () => {
+      try {
+        console.log('Initializing chatbot useEffect...');
+        // // 先从localStorage加载状态
+        // loadStateFromStorage();
+        
+        // 初始化聊天机器人
+        await chatbotApi.initChatbot();
+        
+        // 标记初始化完成
+        setIsInitialized(true);
+      } catch (err) {
+        console.error('Failed to initialize chatbot:', err);
+        setIsInitialized(true); // 即使失败也标记为初始化完成，允许用户操作
+      }
+    };
+    
+    // 只在组件首次挂载时执行初始化
+    if (!isInitialized) {
+      initChatbot();
+    }
+}, [isInitialized])
 
   return (
     <div className="app">

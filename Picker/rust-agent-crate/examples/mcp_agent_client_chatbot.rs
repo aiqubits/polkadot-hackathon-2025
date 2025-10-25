@@ -21,7 +21,7 @@ async fn main() {
     info!("=== Rust Agent MCP 客户端调用服务端工具示例 ===");
     
     // 从环境变量获取 MCP 服务器 URL
-    let mcp_url = std::env::var("MCP_URL").unwrap_or("http://127.0.0.1:3000".to_string());
+    let mcp_url = std::env::var("MCP_URL").unwrap_or("http://127.0.0.1:6000".to_string());
     
     // 创建 OpenAI 模型实例（可选，用于智能决策是否调用工具）
     // 如果没有设置 API 密钥，则使用一个占位符

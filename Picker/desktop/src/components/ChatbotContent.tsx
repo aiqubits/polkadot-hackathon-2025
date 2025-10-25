@@ -389,7 +389,7 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
           lowerMessage.includes('工具') ||
           lowerMessage.includes('show me available tools')) {
         // 调用获取可用工具接口
-        const tools = await chatbotApi.refreshAvailableTools();
+        const tools = await chatbotApi.getAvailableTools();
         if (tools && tools.length > 0) {
           botResponse = 'Here are the available tools:';
           responseButtons = tools.map((tool, index) => ({
@@ -590,7 +590,7 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
     
     try {
       // 刷新并获取最新的工具列表
-      const tools = await chatbotApi.refreshAvailableTools();
+      const tools = await chatbotApi.getAvailableTools();
       if (tools && tools.length > 0) {
         botResponse = 'Here are the available tools:';
         responseButtons = tools.map((tool, index) => ({
@@ -660,20 +660,6 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
         // 初始化聊天机器人
         await chatbotApi.initChatbot();
         
-        // 从localStorage加载会话后进行排序
-        if (sessions.length > 0) {
-          // 按会话id大小排序（降序，最新的在最上面）
-          const sortedSessions = [...sessions].sort((a: ChatbotSession, b: ChatbotSession) => b.id.localeCompare(a.id));
-          setSessions(sortedSessions);
-          
-          // 如果activeSession不存在于sessions列表中或不存在，选择第一个会话
-          if (!activeSession || !sortedSessions.some(s => s.id === activeSession)) {
-            setActiveSession(sortedSessions[0].id);
-          }
-        } else {
-          // 如果没有会话，不自动加载，等待用户手动创建
-        }
-        
         // 标记初始化完成
         setIsInitialized(true);
       } catch (err) {
@@ -687,7 +673,21 @@ const ChatbotContent: React.FC<ChatbotContentProps> = ({ activeTab }) => {
     if (activeTab === 'chatbot' && !isInitialized) {
       initChatbot();
     }
-}, [activeTab]);
+
+    // 从localStorage加载会话后进行排序
+    if (sessions.length > 0) {
+      // 按会话id大小排序（降序，最新的在最上面）
+      const sortedSessions = [...sessions].sort((a: ChatbotSession, b: ChatbotSession) => b.id.localeCompare(a.id));
+      setSessions(sortedSessions);
+      
+      // 如果activeSession不存在于sessions列表中或不存在，选择第一个会话
+      if (!activeSession || !sortedSessions.some(s => s.id === activeSession)) {
+        setActiveSession(sortedSessions[0].id);
+      }
+    } else {
+      // 如果没有会话，不自动加载，等待用户手动创建
+    }    
+}, [activeTab, isInitialized]);
 
   // 添加useEffect钩子来监听状态变化并保存到localStorage
   useEffect(() => {

@@ -123,7 +123,7 @@ use rust_agent::{SimpleMcpServer, McpServer, ExampleTool};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create MCP server instance
-    let server = SimpleMcpServer::new().with_address("127.0.0.1:3000".to_string());
+    let server = SimpleMcpServer::new().with_address("127.0.0.1:6000".to_string());
     
     // Create example tools
     let weather_tool = ExampleTool::new(
@@ -141,9 +141,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     server.register_tool(Box::new(calculator_tool))?;
     
     // Start the server
-    server.start("127.0.0.1:3000").await?;
+    server.start("127.0.0.1:6000").await?;
     
-    println!("MCP server started at 127.0.0.1:3000");
+    println!("MCP server started at 127.0.0.1:6000");
     println!("Registered tools: get_weather, calculate");
     
     // Simulate server running for a while

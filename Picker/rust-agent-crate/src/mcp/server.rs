@@ -36,7 +36,7 @@ pub struct SimpleMcpServer {
 impl SimpleMcpServer {
     pub fn new() -> Self {
         Self {
-            address: "127.0.0.1:3000".to_string(),
+            address: "127.0.0.1:6000".to_string(),
             tools: Arc::new(Mutex::new(HashMap::new())),
             is_running: Arc::new(Mutex::new(false)),
             server_handle: Arc::new(Mutex::new(None)),
@@ -52,7 +52,7 @@ impl SimpleMcpServer {
 // 简单的测试handler
 #[axum::debug_handler]
 async fn test_handler() -> &'static str {
-    "Hello, World!"
+    "Hello, Rust-Agent!"
 }
 
 // 处理JSON-RPC请求
@@ -84,6 +84,15 @@ async fn handle_jsonrpc_request(
                         }),
                     }
                 }
+            }
+        }
+        "ping" => {
+            // 处理ping请求
+            JSONRPCResponse {
+                jsonrpc: "2.0".to_string(),
+                id: Some(payload.id.unwrap_or(Value::Null)),
+                result: Some(Value::Object(serde_json::Map::new())),
+                error: None,
             }
         }
         "tools/list" => {

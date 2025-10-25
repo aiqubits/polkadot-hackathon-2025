@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use crate::mcp::JSONRPCRequest;
@@ -27,6 +27,8 @@ pub struct SimpleMcpClient {
     pub available_tools: Vec<McpTool>,
     // 使用Arc包装工具处理器，使其支持克隆
     pub tool_handlers: HashMap<String, Arc<dyn Fn(HashMap<String, Value>) -> Pin<Box<dyn Future<Output = Result<Value, Error>> + Send>> + Send + Sync>>,
+    // 连接状态标志，表示是否已成功连接到MCP服务器
+    pub is_mcp_server_connected: Arc<Mutex<bool>>,
 }
 
 // 实现 SimpleMcpClient 结构体的方法
@@ -36,6 +38,7 @@ impl SimpleMcpClient {
             url,
             available_tools: Vec::new(),
             tool_handlers: HashMap::new(),
+            is_mcp_server_connected: Arc::new(Mutex::new(false)), // 初始状态为未连接
         }
     }
     
@@ -65,6 +68,23 @@ impl SimpleMcpClient {
     pub fn clear_tools(&mut self) {
         self.available_tools.clear();
     }
+    
+    // 设置服务器连接状态
+    pub fn set_server_connected(&self, connected: bool) {
+        if let Ok(mut conn_status) = self.is_mcp_server_connected.lock() {
+            *conn_status = connected;
+            if connected {
+                info!("MCP server connection status set to connected");
+            } else {
+                info!("MCP server connection status set to disconnected");
+            }
+        }
+    }
+    
+    // 获取服务器连接状态
+    pub fn is_server_connected(&self) -> bool {
+        *self.is_mcp_server_connected.lock().unwrap_or_else(|e| e.into_inner())
+    }
 }
 
 // 为 SimpleMcpClient 实现 McpClient trait
@@ -82,7 +102,20 @@ impl McpClient for SimpleMcpClient {
     fn get_tools(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<McpTool>, Error>> + Send + '_>> {
         let url = self.url.clone();
         let local_tools = self.available_tools.clone();
+        let is_connected = self.is_mcp_server_connected.clone();
         Box::pin(async move {
+            // 首先检查连接状态标志，如果未连接则直接返回本地工具列表
+            let connected = if let Ok(conn) = is_connected.lock() {
+                *conn
+            } else {
+                false
+            };
+
+            if !connected {
+                warn!("MCP server is not connected, returning local tools only");
+                return Ok(local_tools);
+            }
+            
             if !url.is_empty() {
                 // 构造JSON-RPC请求
                 let request = JSONRPCRequest {
@@ -257,8 +290,14 @@ impl McpClient for SimpleMcpClient {
     
     // 断开连接
     fn disconnect(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Error>> + Send + '_>> {
+        let url = self.url.clone();
+        let is_connected = self.is_mcp_server_connected.clone();
         Box::pin(async move {
             // 简单实现：模拟断开连接成功
+            if let Ok(mut conn) = is_connected.lock() {
+                *conn = false;
+            }
+            info!("Disconnected from MCP server at {}", url);
             Ok(())
         })
     }
@@ -288,11 +327,90 @@ impl McpClient for SimpleMcpClient {
         
         // 复制工具处理器
         let tool_handlers = self.tool_handlers.clone();
+
+        // 克隆连接状态
+        let is_connected = if let Ok(conn) = self.is_mcp_server_connected.lock() {
+            Arc::new(Mutex::new(*conn))
+        } else {
+            Arc::new(Mutex::new(false))
+        };
         
         Box::new(SimpleMcpClient {
             url: self.url.clone(),
             available_tools: tools,
             tool_handlers,
+            is_mcp_server_connected: is_connected,
+        })
+    }
+    
+    // Ping服务器
+    fn ping(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Error>> + Send + '_>> {
+        let url = self.url.clone();
+        Box::pin(async move {
+            if !url.is_empty() {
+                // 构造JSON-RPC ping请求
+                let request = JSONRPCRequest {
+                    jsonrpc: "2.0".to_string(),
+                    id: Some(Value::String(Uuid::new_v4().to_string())),
+                    method: "ping".to_string(),
+                    params: None,
+                };
+
+                // 发送HTTP POST请求
+                let client = reqwest::Client::new();
+                let response = client
+                    .post(&format!("{}/rpc", url))
+                    .json(&request)
+                    .send()
+                    .await;
+
+                // 检查请求是否成功发送
+                match response {
+                    Ok(response) => {
+                        // 检查HTTP状态码
+                        if !response.status().is_success() {
+                            let status = response.status();
+                            let body = response.text().await.unwrap_or_else(|_| "Unable to read response body".to_string());
+                            return Err(Error::msg(format!("MCP server returned HTTP error {}: {}. Response body: {}", status.as_u16(), status.canonical_reason().unwrap_or("Unknown error"), body)));
+                        }
+
+                        // 获取响应文本用于调试
+                        let response_text = response.text().await
+                            .map_err(|e| Error::msg(format!("Failed to read response body: {}", e)))?;
+                        
+                        // 检查响应是否为空
+                        if response_text.trim().is_empty() {
+                            return Err(Error::msg("MCP server returned empty response"));
+                        }
+
+                        // 尝试解析JSON
+                        let rpc_response: JSONRPCResponse = serde_json::from_str(&response_text)
+                            .map_err(|e| Error::msg(format!("Failed to parse response as JSON: {}. Response content: {}", e, response_text)))?;
+                        
+                        // 检查是否有错误
+                        if let Some(error) = rpc_response.error {
+                            return Err(Error::msg(format!("JSON-RPC error: {} (code: {})", error.message, error.code)));
+                        }
+                        
+                        // 验证ping响应是否为空对象
+                        if let Some(result) = rpc_response.result {
+                            if result.is_object() && result.as_object().unwrap().is_empty() {
+                                // Ping成功，返回空对象
+                                return Ok(());
+                            } else {
+                                return Err(Error::msg(format!("Unexpected ping response: {:?}", result)));
+                            }
+                        } else {
+                            return Err(Error::msg("No result in ping response"));
+                        }
+                    }
+                    Err(e) => {
+                        return Err(Error::msg(format!("Failed to send ping request to MCP server: {}", e)));
+                    }
+                }
+            } else {
+                return Err(Error::msg("No URL set for MCP client"));
+            }
         })
     }
 }
@@ -353,4 +471,12 @@ pub trait McpClient: Send + Sync {
     
     // 克隆方法
     fn clone(&self) -> Box<dyn McpClient>;
+    
+    // Ping服务器
+    fn ping(&self) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), Error>> + Send + '_>> {
+        Box::pin(async move {
+            // 默认实现返回错误，因为trait不知道如何发送HTTP请求
+            Err(Error::msg("HTTP client not implemented in trait"))
+        })
+    }
 }
