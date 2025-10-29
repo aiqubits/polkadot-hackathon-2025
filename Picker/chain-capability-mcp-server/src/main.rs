@@ -80,8 +80,8 @@ async fn main() -> Result<()> {
     
     println!("MCP服务器已启动，地址: 127.0.0.1:6000");
     println!("已注册工具:");
-    println!("  1. check_balance: 查询指定地址的ETH和USDT余额");
-    println!("  2. transfer_coin: 转账ETH或USDT到指定地址");
+    println!("  1. check_balance: 查询指定地址的Test Coin余额");
+    println!("  2. transfer_coin: 转账Test Coin到指定地址");
     println!("  3. cross_chain_pay: 跨链支付USDT");
     println!("  4. create_erc20_token: 创建新的ERC20代币");
     println!("  5. create_erc721_nft: 创建新的ERC721 NFT集合");

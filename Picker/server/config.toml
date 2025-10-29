@@ -14,11 +14,11 @@ cleanup_minutes = 10
 
 # 区块链配置
 [blockchain]
-name = "ETH"
-rpc_url = "https://sepolia.infura.io/v3/7cb673f9a1324974899fc4cd4429b450"
-explorer_url = "https://sepolia.etherscan.io"
-token_usdt_url = "https://www.okx.com/api/v5/market/ticker?instId=ETH-USDT"
-authorized_contract_address = "0x83B24dC9d42080Cd3Bf3232d0DCC2D30c342E60C"
+name = "PAS"
+rpc_url = "https://blockscout-passet-hub.parity-testnet.parity.io/api/eth-rpc"
+explorer_url = "https://blockscout-passet-hub.parity-testnet.parity.io/"
+token_usdt_url = "https://www.okx.com/api/v5/market/ticker?instId=USDC-USDT"
+authorized_contract_address = "0xc7a5983345b8577B0D27A7255e62A495A7AE8e7d"
 retry_times = 5
 retry_interval_seconds = 10 
 

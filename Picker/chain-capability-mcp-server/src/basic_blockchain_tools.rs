@@ -67,8 +67,8 @@ impl Tool for CheckBalanceTool {
             // 格式化余额（wei转为ether）
             let balance_eth = alloy::primitives::utils::format_ether(balance);
             
-            info!("Wallet {} has balance: {} ETH", args.wallet_address, balance_eth);
-            Ok(format!("Wallet {} has balance: {} ETH", args.wallet_address, balance_eth))
+            info!("Wallet {} has balance: {} Test Coin", args.wallet_address, balance_eth);
+            Ok(format!("Wallet {} has balance: {} Test Coin", args.wallet_address, balance_eth))
         })
     }
 
@@ -151,7 +151,7 @@ impl Tool for TransferCoinTool {
             };
 
             // 发送交易
-            info!("Sending transaction from {} to {} with amount {} ETH", from_address, to_address, args.amount);
+            info!("Sending transaction from {} to {} with amount {} Test Coin", from_address, to_address, args.amount);
             let pending_tx = provider.send_transaction(tx_request).await
                 .map_err(|e| {
                     error!("Failed to send transaction: {}", e);
@@ -174,7 +174,7 @@ impl Tool for TransferCoinTool {
             // 生成浏览器链接
             let explorer_url = format!("{}/tx/0x{}", config.explorer_url, hex::encode(tx_hash));
 
-            Ok(format!("Successfully transferred {} ETH from {} to {}. Transaction hash: 0x{}. View on explorer: {}", 
+            Ok(format!("Successfully transferred {} Test Coin from {} to {}. Transaction hash: 0x{}. View on explorer: {}", 
                        args.amount, from_address, args.to_address, hex::encode(tx_hash), explorer_url))
         })
     }
