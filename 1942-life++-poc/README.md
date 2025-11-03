@@ -1,8 +1,56 @@
 # Life++ PoC - 基于 Polkadot REVM 的认知证明系统
 
+English | 中文
+
+[`English`](./README.en.md) | [`中文`](./README.md)
+
 ## 🎯 项目概述
 
 Life++ PoC 是一个基于 Polkadot REVM 的**认知证明系统**，为 AI 代理、机器人和数字孪生提供可验证的认知过程证明。项目实现了完整的端到端解决方案，从智能合约到用户界面。
+
+## 🖼️ 页面展示
+
+按照左侧菜单顺序，前端提供了完整的业务功能页面，便于评委/用户快速上手体验：
+
+- **Overview Dashboard（总览仪表盘）**: 展示当日证明量、活跃代理、在线验证者、平均验证时长；包含 24h 提交量柱状图、系统健康（区块链/IPFS/验证网络/API 服务）与最近活动、Top Agents 排行。
+  
+  ![Overview Dashboard](./picture/overview-dashboard.png)
+- **Regulatory Oversight（监管审查）**: 汇总今日统计（自动通过/待审/拒绝等），罗列“待审查证明”卡片，支持一键 Review/Approve/Reject 的监管动作，适配合规工作流。
+  
+  ![Regulatory Oversight](./picture/regulatory-oversight.png)
+- **Proof Explorer（证明浏览器）**: 支持按关键字搜索与状态筛选，表格展示 Proof ID、Agent、Status、Value、Validators、Time，提供“View Details” 查看链上/存证详情。
+  
+  ![Proof Explorer](./picture/proof-explorer.png)
+- **Agent Registry（代理注册）**: 展示代理总量、当日活跃、平均 ChainRank、总证明数；卡片化列出 Agent 的 CID、ChainRank、Proofs，并可查看详情。
+  
+  ![Agent Registry](./picture/agent-registry.png)
+- **ChainRank Analytics（声誉分析）**: 展示网络平均、Top Performer、达标统计、总计入数量；列表展示 Top Ranked Agents 及 Consistency/Density/Outcome 等指标。
+  
+  ![ChainRank Analytics](./picture/chainrank-analytics.png)
+- **Compliance Center（合规中心）**: 展示 KYC/AML 指标与监控状态（如 Chainalysis、TRM、制裁名单、PEP 等）的运行情况与更新时间，服务健康一目了然。
+  
+  ![Compliance Center](./picture/compliance-center.png)
+- **Token Economics（代币经济）**: 展示 CATK 价格、总质押、aNFT 铸造量、24h 成交量，并以表格汇总代币核心指标（供应、流通、质押、销毁、市值等）。
+  
+  ![Token Economics](./picture/token-economics.png)
+- **System Settings（系统设置）**: 可配置网络（RPC、IPFS、ChainId）、验证参数（所需见证数、窗口、截止、自动通过阈值）、监管阈值与安全设置；支持“恢复默认/保存”。
+  
+  ![System Settings](./picture/system-settings.png)
+
+> 以上所有页面已在前端实现并可直接访问，示意图见上方截图。
+
+> 数据来源说明（真实/模拟）：
+>
+> - Overview Dashboard：
+>   - 真实：Top Performing Agents（从链上经 Indexer 拉取）
+>   - 模拟：四个概览卡片与 24h 柱状图、Recent Activity、System Health 指标（用于展示完整 UI 效果）
+> - Regulatory Oversight：主要为模拟数据（演示监管流程与操作按钮）
+> - Proof Explorer：真实链上数据（支持搜索与状态筛选，详情弹窗真实接口）
+> - Agent Registry：真实链上数据（代理卡片与统计）
+> - ChainRank Analytics：统计面板与排行榜为模拟汇总（用于演示指标与排序）
+> - Compliance Center：监控状态为模拟数据（演示集成位点与健康展示）
+> - Token Economics：代币与交易指标为模拟数据（演示经济看板）
+> - System Settings：前端配置表单（演示交互，不作为持久化配置来源）
 
 ## 🏗️ 项目架构
 
