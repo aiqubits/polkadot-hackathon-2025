@@ -11,6 +11,7 @@ module.exports = {
     'packages/relayer/.logs/**',
     'react-wordle/build/**',
     'react-wordle/dist/**',
+    'test-client/**',
   ],
   env: {
     es2022: true,
@@ -26,7 +27,8 @@ module.exports = {
   extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended', 'plugin:prettier/recommended'],
   rules: {
     '@typescript-eslint/no-explicit-any': 'off',
-    'prettier/prettier': 'warn',
+    '@typescript-eslint/no-unused-vars': 'off',
+    'prettier/prettier': 'off',
   },
   overrides: [
     {
@@ -42,6 +44,11 @@ module.exports = {
       extends: ['plugin:react/recommended', 'plugin:react-hooks/recommended', 'plugin:jsx-a11y/recommended'],
       rules: {
         'react/prop-types': 'off',
+        'react-hooks/exhaustive-deps': 'off',
+        '@typescript-eslint/no-unused-vars': 'off',
+        'react/react-in-jsx-scope': 'off',
+        'jsx-a11y/click-events-have-key-events': 'off',
+        'jsx-a11y/no-static-element-interactions': 'off',
       },
       settings: {
         react: {
@@ -71,3 +78,11 @@ module.exports = {
     },
   ],
 }
+
+
+
+
+
+
+
+

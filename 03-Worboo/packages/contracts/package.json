@@ -11,7 +11,11 @@
     "gas": "hardhat test",
     "deploy:moonbase": "hardhat ignition deploy ./ignition/modules/WorbooModule.ts --network moonbase",
     "deploy:moonbeam": "hardhat ignition deploy ./ignition/modules/WorbooModule.ts --network moonbeam",
-    "export:addresses": "ts-node scripts/export-addresses.ts"
+    "export:addresses": "ts-node scripts/export-addresses.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"{contracts,ignition,scripts,test}/**/*.{ts,tsx}\"",
+    "format:check": "prettier --check \"{contracts,ignition,scripts,test}/**/*.{ts,tsx}\""
   },
   "keywords": [],
   "author": "",
