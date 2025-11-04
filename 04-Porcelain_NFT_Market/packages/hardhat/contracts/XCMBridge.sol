@@ -53,6 +53,7 @@ contract XCMBridge is IERC721Receiver, Ownable, ReentrancyGuard, Pausable {
     mapping(bytes32 => XCMMessage) public xcmMessages;
     mapping(address => bool) public authorizedContracts;
     mapping(uint32 => bool) public supportedChains;
+    mapping(address => mapping(uint256 => bytes32)) public nftToMessageHash;
 
     // Events
     event NFTLocked(
@@ -198,9 +199,10 @@ contract XCMBridge is IERC721Receiver, Ownable, ReentrancyGuard, Pausable {
         uint256 tokenId,
         address recipient,
         uint32 sourceChainId
-    ) external onlyOwner {
+    ) external nonReentrant whenNotPaused {
         require(!xcmMessages[messageHash].processed, "Message already processed");
         require(supportedChains[sourceChainId], "Source chain not supported");
+        require(authorizedContracts[nftContract], "Contract not authorized");
 
         xcmMessages[messageHash] = XCMMessage({
             messageType: messageType,
@@ -212,6 +214,20 @@ contract XCMBridge is IERC721Receiver, Ownable, ReentrancyGuard, Pausable {
             messageHash: messageHash,
             processed: true
         });
+
+        // For LOCK_NFT messages, create a CrossChainNFT record on the destination chain
+        // This allows the recipient to unlock the NFT later
+        if (messageType == MessageType.LOCK_NFT) {
+            crossChainNFTs[messageHash] = CrossChainNFT({
+                originalContract: nftContract,
+                originalTokenId: tokenId,
+                originalOwner: recipient,
+                sourceChainId: sourceChainId,
+                destinationChainId: uint32(block.chainid),
+                isLocked: true,
+                timestamp: block.timestamp
+            });
+        }
 
         emit XCMMessageReceived(messageHash, messageType, sourceChainId);
     }

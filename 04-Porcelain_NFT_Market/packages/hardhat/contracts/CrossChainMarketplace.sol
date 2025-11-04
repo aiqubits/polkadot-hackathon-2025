@@ -180,15 +180,18 @@ contract CrossChainMarketplace is Ownable, ReentrancyGuard, Pausable {
             
             // Transfer fee to fee recipient
             if (fee > 0) {
-                payable(feeRecipient).transfer(fee);
+                (bool feeSuccess, ) = payable(feeRecipient).call{value: fee}("");
+                require(feeSuccess, "Fee transfer failed");
             }
             
             // Transfer payment to seller
-            payable(listing.seller).transfer(sellerAmount);
+            (bool sellerSuccess, ) = payable(listing.seller).call{value: sellerAmount}("");
+            require(sellerSuccess, "Seller payment failed");
             
             // Refund excess payment
             if (msg.value > totalPrice) {
-                payable(msg.sender).transfer(msg.value - totalPrice);
+                (bool refundSuccess, ) = payable(msg.sender).call{value: msg.value - totalPrice}("");
+                require(refundSuccess, "Refund failed");
             }
         } else {
             IERC20 paymentToken = IERC20(listing.paymentToken);

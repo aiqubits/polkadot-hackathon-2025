@@ -67,6 +67,11 @@ export const menuLinks: HeaderMenuLink[] = [
     label: "我的数藏",
     href: "/profile",
     icon: <ArrowUpTrayIcon className="h-4 w-4" />,
+  },
+  {
+    label: "包装NFT",
+    href: "/wrapped-nfts",
+    icon: <PhotoIcon className="h-4 w-4" />,
   }
   //{
     //label: "调试合约",

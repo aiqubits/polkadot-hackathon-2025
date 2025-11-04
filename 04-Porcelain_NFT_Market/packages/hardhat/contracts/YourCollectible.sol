@@ -207,7 +207,8 @@ contract YourCollectible is
         require(!isFractionalized[tokenId], "Cannot list fractionalized NFT");
 
 		// 将上架费用转给合约拥有者
-        payable(owner()).transfer(listingFee);
+        (bool feeSuccess, ) = payable(owner()).call{value: listingFee}("");
+        require(feeSuccess, "Fee transfer failed");
 
         // 转移NFT到合约，并授权合约可以转移NFT
         // _transfer(msg.sender, address(this), tokenId);

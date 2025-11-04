@@ -4,6 +4,7 @@ import Image from "next/image";
 import type { NextPage } from "next";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { CrossChainNFT } from "~~/components/CrossChainNFT";
 
 const Home: NextPage = () => {
   // 简化动画变体
@@ -196,6 +197,13 @@ const Home: NextPage = () => {
             />
           </div>
         ))}
+      </div>
+
+      {/* 跨链NFT功能区域 */}
+      <div className="relative z-10 mt-16 px-4">
+        <div className="max-w-4xl mx-auto">
+          <CrossChainNFT />
+        </div>
       </div>
 
       {/* 添加全局CSS动画 */}
