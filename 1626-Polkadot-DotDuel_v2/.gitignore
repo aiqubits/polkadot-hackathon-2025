@@ -1,0 +1,54 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnp/
+.pnp.js
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# Logs
+logs/
+*.log
+
+# Build / output
+dist/
+build/
+coverage/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Hardhat / Solidity artifacts
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+cache/
+artifacts/
+
+# Frontend / backend specific
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+backend/node_modules/
+backend/dist/
+backend/logs/
+
+# Temporary
+*.tmp
+*.temp
+
+# Ignore local generated files
+/.env
