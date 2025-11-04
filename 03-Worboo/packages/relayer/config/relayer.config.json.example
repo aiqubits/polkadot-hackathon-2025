@@ -1,0 +1,18 @@
+{
+  "rpcUrl": "https://rpc.api.moonbase.moonbeam.network",
+  "privateKey": "0xabc123...",
+  "registryAddress": "0xRegistryAddress",
+  "tokenAddress": "0xTokenAddress",
+  "rewardPerWin": "10",
+  "maxRetries": 3,
+  "backoffMs": 1000,
+  "cachePath": ".cache/processed-events.jsonl",
+  "cacheMaxEntries": 1000,
+  "healthPath": ".cache/health.json",
+  "healthHost": "0.0.0.0",
+  "healthCorsOrigin": "*",
+  "healthPort": 8787,
+  "logFilePath": ".logs/worboo-relayer.log",
+  "logMaxBytes": 5242880,
+  "logBackupCount": 5,\n  "logHttpEndpoint": "https://logs.example/ship"\n}
+

@@ -43,7 +43,10 @@ async function main() {
     wallet
   )
 
-  const store = await ProcessedEventStore.open({ filePath: cfg.cachePath })
+  const store = await ProcessedEventStore.open({
+    filePath: cfg.cachePath,
+    maxEntries: cfg.cacheMaxEntries,
+  })
   const metrics = new RelayerMetrics({
     healthPath: RelayerMetrics.resolveDefaultPath(cfg.healthPath),
   })
@@ -54,6 +57,7 @@ async function main() {
     host: cfg.healthHost,
     port: cfg.healthPort,
     logger,
+    corsOrigin: cfg.healthCorsOrigin,
   })
 
   const handler = createGameRecordedHandler({
@@ -80,6 +84,7 @@ async function main() {
     cache: store.path,
     healthPath: metrics.path,
     healthServerPort: healthServer.address()?.port ?? cfg.healthPort,
+    healthCorsOrigin: cfg.healthCorsOrigin ?? 'disabled',
   })
 
   registry.on(

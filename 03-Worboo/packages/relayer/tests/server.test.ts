@@ -35,6 +35,7 @@ describe('startHealthServer', () => {
       host: '127.0.0.1',
       port: 0,
       logger,
+      corsOrigin: '*',
     })
 
     const address = server.address()
@@ -44,6 +45,7 @@ describe('startHealthServer', () => {
     const response = await fetch(url)
     expect(response.status).toBe(200)
     const payload = await response.json()
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
     expect(payload.status).toBeDefined()
     expect(payload.queueDepth).toBe(0)
 
@@ -64,12 +66,28 @@ describe('startHealthServer', () => {
       host: '127.0.0.1',
       port: 0,
       logger,
+      corsOrigin: 'https://app.example',
     })
 
     const address = server.address()
     const url = `http://${address?.address}:${address?.port}/unknown`
     const response = await fetch(url)
     expect(response.status).toBe(404)
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://app.example')
+
+    const optionsResponse = await fetch(
+      `http://${address?.address}:${address?.port}/healthz`,
+      {
+        method: 'OPTIONS',
+        headers: {
+          'Access-Control-Request-Method': 'GET',
+        },
+      }
+    )
+    expect(optionsResponse.status).toBe(204)
+    expect(optionsResponse.headers.get('access-control-allow-origin')).toBe('https://app.example')
+    expect(optionsResponse.headers.get('access-control-allow-methods')).toContain('GET')
+    expect(optionsResponse.headers.get('vary')).toBe('Origin')
 
     await server.close()
     rmSync(dir, { recursive: true, force: true })

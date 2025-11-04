@@ -63,6 +63,17 @@ RELAYER_LOG_BACKUPS=5           # keep 5 rotated files
 
 Logs are JSONL entries; ship them to Loki/ELK for dashboards. Rotation occurs whenever the active file exceeds the size threshold.
 
+## Log Shipping
+
+- Set `RELAYER_LOG_HTTP_ENDPOINT` (or `logHttpEndpoint`) to POST each log line to an external collector such as Loki, Logflare, or Datadog.
+- Endpoint receives the raw JSON record produced by the logger; add auth headers via reverse proxy if required.
+
+## Processed Event Cache
+
+- `RELAYER_CACHE_MAX_ENTRIES` (or `cacheMaxEntries` in JSON) caps the dedupe file; the relayer trims oldest entries automatically.
+- Persist the `.cache/` directory if you run in containers so restarts keep their processed-event memory.
+
+
 ## Frontend Health Banner
 
 The navbar consumes the `/healthz` endpoint (fallback to same-origin `/healthz` if no URL provided). When the relayer is down, the banner surfaces `Health check failed: <error>` to users. Configure `REACT_APP_RELAYER_HEALTH_URL` if the health endpoint lives on a different host.

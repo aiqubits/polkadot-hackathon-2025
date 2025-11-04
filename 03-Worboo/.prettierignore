@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+coverage
+.cache
+packages/contracts/artifacts
+packages/contracts/cache
+packages/contracts/coverage
+packages/relayer/.cache
+react-wordle/build
+react-wordle/dist
+packages/relayer/.logs

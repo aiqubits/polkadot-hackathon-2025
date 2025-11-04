@@ -1,6 +1,6 @@
-import { appendFile, mkdir, rename, stat, writeFile } from "fs/promises";
-import { existsSync } from "fs";
-import { dirname } from "path";
+import { appendFile, mkdir, rename, stat, writeFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { dirname } from 'path'
 
 type LogLevel = 'info' | 'warn' | 'error'
 
@@ -17,6 +17,7 @@ type LoggerOptions = {
   filePath?: string
   maxBytes?: number
   backups?: number
+  httpEndpoint?: string
 }
 
 const createRecord = (
@@ -89,38 +90,62 @@ class FileAppender {
   }
 }
 
-export const createLogger = ({
+export function createLogger({
   context,
   infoWriter,
   errorWriter,
   filePath,
   maxBytes = 5 * 1024 * 1024,
   backups = 5,
-}: LoggerOptions = {}): StructuredLogger => {
+  httpEndpoint,
+}: LoggerOptions = {}): StructuredLogger {
   const writeInfo = infoWriter ?? ((line: string) => console.log(line))
   const writeError = errorWriter ?? ((line: string) => console.error(line))
   const fileAppender = filePath ? new FileAppender(filePath, maxBytes, backups) : undefined
+  const httpTarget = httpEndpoint?.trim()
 
-  const write = (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
-    const record = JSON.stringify(createRecord(level, message, context, meta))
-    if (level === 'error') {
-      writeError(record)
-    } else if (level === 'warn') {
+  const emitRecord = (
+    level: LogLevel,
+    record: string,
+    { skipHttp }: { skipHttp?: boolean } = {}
+  ) => {
+    if (level === 'error' || level === 'warn') {
       writeError(record)
     } else {
       writeInfo(record)
     }
+
     if (fileAppender) {
       void fileAppender.write(record).catch((error) => {
-        writeError(
-          JSON.stringify(
-            createRecord('error', '[relayer] failed to write log file', context, {
-              error: error instanceof Error ? error.message : error,
-            })
-          )
+        const failure = JSON.stringify(
+          createRecord('error', '[relayer] failed to write log file', context, {
+            error: error instanceof Error ? error.message : error,
+          })
         )
+        writeError(failure)
       })
     }
+
+    if (!skipHttp && httpTarget && typeof fetch === 'function') {
+      void fetch(httpTarget, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: record,
+        keepalive: true,
+      }).catch((error) => {
+        const failure = JSON.stringify(
+          createRecord('warn', '[relayer] log shipping failed', context, {
+            error: error instanceof Error ? error.message : error,
+          })
+        )
+        emitRecord('warn', failure, { skipHttp: true })
+      })
+    }
+  }
+
+  const write = (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
+    const record = JSON.stringify(createRecord(level, message, context, meta))
+    emitRecord(level, record)
   }
 
   return {
@@ -129,4 +154,3 @@ export const createLogger = ({
     error: (message, meta) => write('error', message, meta),
   }
 }
-

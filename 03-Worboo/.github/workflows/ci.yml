@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: HUSKY=0 npm install --ignore-scripts
+
+      - name: Lint (contracts + relayer)
+        run: npm run lint
+
+      - name: Contracts tests
+        run: npm run test
+        working-directory: packages/contracts
+
+      - name: Relayer tests
+        run: npm test
+        working-directory: packages/relayer
+
+      - name: Frontend targeted tests
+        run: npm test -- --watch=false --testPathPattern="(shop|contracts|words|RelayerStatusBanner|useRelayerNotifications)"
+        working-directory: react-wordle

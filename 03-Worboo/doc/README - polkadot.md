@@ -33,9 +33,13 @@ See [`mvp-architecture.md`](mvp-architecture.md) for detailed data flow diagrams
    ```bash
    git clone https://github.com/<your-fork>/worboo.git
    cd 03-Worboo
+   npm install --ignore-scripts
+   # or install each workspace individually:
    npm install --prefix packages/contracts
+   npm install --prefix packages/relayer
    npm install --ignore-scripts --prefix react-wordle
    ```
+> Set `HUSKY=0` (or `HUSKY_SKIP_INSTALL=1`) if Husky complains about missing `.git` during installation.
 2. **Configure contracts**
    - Fill `packages/contracts/.env` with `PRIVATE_KEY` and Moonbase RPC URL.
    - Compile and test: `npm run compile && npm run test` (from `packages/contracts`).
@@ -53,12 +57,14 @@ See [`mvp-architecture.md`](mvp-architecture.md) for detailed data flow diagrams
    ```bash
    npx hardhat run --network moonbase scripts/grantGameMaster.ts <tokenAddress> <relayerWallet>
    cd ../relayer
-   cp .env.example .env   # fill RPC URL, private key, addresses
+   cp config/relayer.config.json.example config/relayer.config.json
+   # edit config/relayer.config.json with RPC URL, private key, registry/token addresses
    npm run start
    ```
-   The relayer listens for `GameRecorded` events, persists processed logs to `.cache/processed-events.jsonl`, and mints WBOO for victorious players. The frontend navbar now shows pending/success banners so judges can see rewards landing in real time. Run `npm run status` inside `packages/relayer` to print a JSON health snapshot (queue depth, last mint, processed cache size) or hit `http://localhost:8787/healthz` (frontend defaults to `/healthz` when the env var is omitted).
+   The relayer listens for `GameRecorded` events, persists processed logs to `.cache/processed-events.jsonl`, and mints WBOO for victorious players. JSON config is now the default; environment variables are still honoured for quick overrides (`RELAYER_CONFIG_PATH` lets you point to configs outside the repo). Set `healthCorsOrigin` (or `RELAYER_HEALTH_CORS_ORIGIN`) to match your dashboard origin, or `"disable"` to omit the header entirely. The frontend navbar shows pending/success banners so judges can see rewards landing in real time. Run `npm run status` inside `packages/relayer` to print a JSON health snapshot (queue depth, last mint, processed cache size) or hit `http://localhost:8787/healthz`.
 6. **Testing scripts**
    - Contracts: `packages/contracts/npm run test`.
+   - Monorepo lint: `npm run lint`.
    - Contracts (coverage/gas): `packages/contracts/npm run coverage` and `npm run gas` (set `REPORT_GAS=true`).
    - Targeted frontend tests: `react-wordle/npm test -- --watch=false --testPathPattern="(shop|contracts|words|RelayerStatusBanner|useRelayerNotifications)"`.
    - Relayer: `packages/relayer/npm test`.
@@ -108,10 +114,12 @@ Optional extras (stretch goals):
 - [`polkadot-target.md`](polkadot-target.md): rationale for choosing Moonbase/Moonbeam.
 - [`implementation-plan.md`](implementation-plan.md): milestone tracker and future tasks.
 - [`deployment-guide.md`](deployment-guide.md): step-by-step setup for contracts, frontend, and relayer.
+- [`deployment-guide.zh-CN.md`](deployment-guide.zh-CN.md): 中文部署指南，适用于本地演示与黑客松提交。
 - [`demo-playbook.md`](demo-playbook.md): live presentation script.
 - [`roadmap-next.md`](roadmap-next.md): post-hackathon backlog.
 - [`handoff.md`](handoff.md): current gaps and guidance for future contributors.
 - [`testing-matrix.md`](testing-matrix.md): commands, coverage targets, and CI TODOs.
+- [`packages/indexer/README.md`](../packages/indexer/README.md): placeholder instructions for future Subsquid/SubQuery work.
 - [`Migrating Ethereum DApps to Polkadot – Technical Roadmap & Strategy.pdf`](Migrating%20Ethereum%20DApps%20to%20Polkadot%20–%20Technical%20Roadmap%20%26%20Strategy.pdf): background research.
 
 ---
@@ -126,6 +134,12 @@ Optional extras (stretch goals):
 ---
 
 Ready to jam on Polkadot 🌐🔤🟩? Ping the maintainers or open a GitHub issue if you need help reproducing results during judging.
+
+
+
+
+
+
 
 
 

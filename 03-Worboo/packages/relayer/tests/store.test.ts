@@ -45,4 +45,42 @@ describe('ProcessedEventStore', () => {
     expect(reloaded.size).toBe(1)
     expect(reloaded.hasProcessed('0xdef:0')).toBe(true)
   })
+
+  it('trims oldest entries when maxEntries is exceeded', async () => {
+    const store = await ProcessedEventStore.open({
+      filePath,
+      maxEntries: 2,
+    })
+
+    await store.markProcessed('0xaaa:0', { txHash: '0x1' })
+    await store.markProcessed('0xbbb:0', { txHash: '0x2' })
+    await store.markProcessed('0xccc:0', { txHash: '0x3' })
+
+    const reloaded = await ProcessedEventStore.open({
+      filePath,
+      maxEntries: 2,
+    })
+
+    expect(reloaded.size).toBe(2)
+    expect(reloaded.hasProcessed('0xaaa:0')).toBe(false)
+    expect(reloaded.hasProcessed('0xbbb:0')).toBe(true)
+    expect(reloaded.hasProcessed('0xccc:0')).toBe(true)
+  })
+
+  it('applies trimming on initial load when cache exceeds limit', async () => {
+    const store = await ProcessedEventStore.open({ filePath })
+    await store.markProcessed('0x111:0', { txHash: '0xa' })
+    await store.markProcessed('0x222:0', { txHash: '0xb' })
+    await store.markProcessed('0x333:0', { txHash: '0xc' })
+
+    const limited = await ProcessedEventStore.open({
+      filePath,
+      maxEntries: 1,
+    })
+
+    expect(limited.size).toBe(1)
+    expect(limited.hasProcessed('0x333:0')).toBe(true)
+    expect(limited.hasProcessed('0x222:0')).toBe(false)
+    expect(limited.hasProcessed('0x111:0')).toBe(false)
+  })
 })

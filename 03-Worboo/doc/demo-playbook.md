@@ -49,7 +49,25 @@ This guide is written for live judging sessions. Follow it to demonstrate the Wo
 
 ---
 
-## 3. Troubleshooting Tips
+## 3. Demo Recording Checklist
+
+1. **Verify code health**
+   - Run `npm run lint` (root) and `npm test` inside `packages/contracts` plus `packages/relayer`.
+   - Ensure the relayer config has sensible `cacheMaxEntries` and, if required, `RELAYER_LOG_HTTP_ENDPOINT` for external log shipping.
+2. **Spin up services**
+   - Start the relayer (`npm run start`) and confirm `npm run status` reports `status: "idle"` with queue depth 0.
+   - Launch the frontend (`npm start` in `react-wordle`) and clear cached data before recording.
+3. **Capture flow**
+   - Wallet connect → register → solve puzzle → observe relayer banner (`Relayer minted +X WBOO`) → purchase cosmetic.
+   - While recording, briefly show `/healthz` JSON and mention Docker/PM2 deployment options.
+4. **Closing narration**
+   - Point to documentation (`README.md`, deployment guide, handoff) and mention the indexer scaffold (`packages/indexer/README.md`) for roadmap continuity.
+
+Save the raw screen capture plus a trimmed version for final submission.
+
+---
+
+## 4. Troubleshooting Tips
 
 - **No DEV balance**: revisit the Moonbeam faucet. Ensure the wallet network is Moonbase Alpha (chainId 1287).
 - **Registration button stuck**: refresh after the transaction confirms; the UI refetches profile data via React Query.
@@ -58,7 +76,7 @@ This guide is written for live judging sessions. Follow it to demonstrate the Wo
 
 ---
 
-## 4. Follow-up Talking Points
+## 5. Follow-up Talking Points
 
 - The architecture is deliberately modular: WorbooToken and WorbooShop can be extended for future seasons, cross-chain rewards, and DAO governance.
 - Halo2 WASM workers remain in the repo for future “proof-of-play” upgrades once parachain verifier support matures.

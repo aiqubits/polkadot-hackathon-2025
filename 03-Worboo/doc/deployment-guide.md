@@ -26,12 +26,14 @@ This guide walks through the complete setup required to run Worboo end-to-end du
 git clone https://github.com/<your-fork>/worboo.git
 cd worboo/03-Worboo
 
+npm install --ignore-scripts
+# or install each workspace individually:
 npm install --prefix packages/contracts
-npm install --ignore-scripts --prefix react-wordle
 npm install --prefix packages/relayer
+npm install --ignore-scripts --prefix react-wordle
 ```
 
-The frontend install uses `--ignore-scripts` to skip husky hooks (the hackathon repo may not be a git repo).
+`--ignore-scripts` prevents Husky from running when the repo is installed outside of Git, while the root install bootstraps shared lint/format tooling.
 
 ---
 
@@ -128,34 +130,42 @@ Confirm the transaction in block explorers such as https://moonbase.moonscan.io/
 
 ## 8. Configure & Run the Reward Relayer (Optional but Recommended)
 
-1. Copy the template:
+1. Copy the JSON config template (preferred workflow):
    ```bash
-   cp packages/relayer/.env.example packages/relayer/.env
+   cp packages/relayer/config/relayer.config.json.example packages/relayer/config/relayer.config.json
    ```
-2. Fill in the fields:
-   ```ini
-   RELAYER_RPC_URL=https://rpc.api.moonbase.moonbeam.network
-   RELAYER_PRIVATE_KEY=0xRELAYER_PRIVATE_KEY    # wallet with GAME_MASTER_ROLE
-   RELAYER_REGISTRY_ADDRESS=0x...
-   RELAYER_TOKEN_ADDRESS=0x...
-   RELAYER_REWARD_PER_WIN=10                    # optional, defaults to 10 WBOO
-   RELAYER_MAX_RETRIES=3                        # optional, defaults to 3 attempts
-   RELAYER_BACKOFF_MS=1000                      # optional, base backoff in ms
-   RELAYER_CACHE_PATH=.cache/processed-events.jsonl    # optional override
-   RELAYER_HEALTH_PATH=.cache/health.json              # optional, used by npm run status
-   RELAYER_HEALTH_HOST=0.0.0.0                         # optional, HTTP bind host
-   RELAYER_HEALTH_PORT=8787
-RELAYER_LOG_FILE=.logs/worboo-relayer.log
-RELAYER_LOG_MAX_BYTES=5242880        # optional, rotate when file exceeds 5 MB
-RELAYER_LOG_BACKUPS=5                # optional, number of rotated files to keep
-# optional, defaults to 8787
+   Update the file with your Moonbase details:
+   ```json
+   {
+     "rpcUrl": "https://rpc.api.moonbase.moonbeam.network",
+     "privateKey": "0xRELAYER_PRIVATE_KEY",
+     "registryAddress": "0x...",
+     "tokenAddress": "0x...",
+     "rewardPerWin": "10",
+     "maxRetries": 3,
+     "backoffMs": 1000,
+     "cachePath": ".cache/processed-events.jsonl",
+    "cacheMaxEntries": 1000,
+    "healthPath": ".cache/health.json",
+     "healthHost": "0.0.0.0",
+     "healthCorsOrigin": "*",
+     "healthPort": 8787,
+     "logFilePath": ".logs/worboo-relayer.log",
+     "logMaxBytes": 5242880,
+     "logBackupCount": 5,
+    "logHttpEndpoint": "https://logs.example/ship"
+   }
    ```
-3. Start the relayer:
+   > You can store the config file wherever you like. Set `RELAYER_CONFIG_PATH` if you keep it outside `packages/relayer/config/`. Use `RELAYER_LOG_HTTP_ENDPOINT` (or `logHttpEndpoint`) to forward structured JSON logs to your collector.
+
+   Environment variables remain supported and always take precedence, so you can still drop quick overrides into a `.env` file if required (see `packages/relayer/.env.example`). Set `healthCorsOrigin` (or `RELAYER_HEALTH_CORS_ORIGIN`) to `"disable"` if you need to omit the header entirely.
+
+2. Start the relayer:
    ```bash
    cd packages/relayer
    npm run start
    ```
-4. Output example:
+3. Output example:
    ```
    [relayer] starting Worboo reward listener
     - registry: 0x...
@@ -168,7 +178,7 @@ RELAYER_LOG_BACKUPS=5                # optional, number of rotated files to keep
 
 When a game win occurs (via `recordGame`), the relayer mints `rewardPerWin` WBOO to the victorious player.
 
-> Processed events are persisted to `.cache/processed-events.jsonl` by default so relayer restarts will not double-mint. Delete the file if you intentionally need to re-run historical events.
+> Processed events are persisted to `.cache/processed-events.jsonl` by default so relayer restarts will not double-mint. Configure `cacheMaxEntries` (or `RELAYER_CACHE_MAX_ENTRIES`) to cap retention; the oldest entries are trimmed automatically. Delete the file if you intentionally need to re-run historical events.
 
 Check service health at any time:
 
@@ -179,6 +189,29 @@ npm run status
 This prints a JSON snapshot (queue depth, last mint timestamp, processed cache size) using the persisted health file.
 
 The same payload is available over HTTP at `http://localhost:8787/healthz` (adjust host/port via env). Point `REACT_APP_RELAYER_HEALTH_URL` to this endpoint so the navbar can show live queue depth or surface health errors. JSONL logs are written to `.logs/worboo-relayer.log` when `RELAYER_LOG_FILE` is set; rotate/ship them to your logging backend of choice. See [doc/observability.md](observability.md) for Grafana/Prometheus notes.
+
+### 8.1 Run via Docker (optional)
+
+```bash
+docker build -f packages/relayer/Dockerfile -t worboo-relayer .
+docker run --rm \
+  -p 8787:8787 \
+  -v $(pwd)/packages/relayer/config:/app/packages/relayer/config \
+  -e RELAYER_CONFIG_PATH=/app/packages/relayer/config/relayer.config.json \
+  worboo-relayer
+```
+
+> Mount a directory containing `relayer.config.json` (or pass `RELAYER_CONFIG_PATH`) and, if desired, mount `.cache/` to persist processed events across restarts.
+
+### 8.2 Run via PM2 (optional)
+
+```bash
+npm install --global pm2
+pm2 start packages/relayer/ecosystem.config.cjs
+pm2 status
+```
+
+PM2 will keep the service alive and restart on crashes. Use `pm2 restart worboo-relayer` after updating binaries and `pm2 save` to persist across reboots.
 
 ---
 
@@ -221,5 +254,9 @@ The same payload is available over HTTP at `http://localhost:8787/healthz` (adju
 ---
 
 All steps complete—Worboo is now live on Moonbase Alpha with automatic reward minting. Happy hacking! 🟩🟨⬛
+
+
+
+
 
 

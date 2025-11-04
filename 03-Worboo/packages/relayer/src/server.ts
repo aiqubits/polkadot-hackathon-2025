@@ -12,6 +12,7 @@ type HealthServerOptions = {
   host: string
   port: number
   logger: StructuredLogger
+  corsOrigin?: string
 }
 
 export type HealthServer = {
@@ -25,8 +26,17 @@ export const startHealthServer = async ({
   host,
   port,
   logger,
+  corsOrigin,
 }: HealthServerOptions): Promise<HealthServer> => {
   const server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    const applyCors = () => {
+      if (!corsOrigin) return
+      res.setHeader('Access-Control-Allow-Origin', corsOrigin)
+      if (corsOrigin !== '*') {
+        res.setHeader('Vary', 'Origin')
+      }
+    }
+
     if (req.method === 'GET' && req.url && req.url.startsWith('/healthz')) {
       try {
         const snapshot = await collectHealthSnapshot({
@@ -35,6 +45,7 @@ export const startHealthServer = async ({
           healthPath: metrics.path,
         })
         const payload = JSON.stringify(snapshot)
+        applyCors()
         res.setHeader('Content-Type', 'application/json')
         res.setHeader('Cache-Control', 'no-store')
         res.writeHead(200)
@@ -44,12 +55,23 @@ export const startHealthServer = async ({
         logger.error('[relayer] health endpoint failed', {
           error: error instanceof Error ? error.message : error,
         })
+        applyCors()
         res.writeHead(500)
         res.end('{"error":"health_unavailable"}\n')
         return
       }
     }
 
+    if (req.method === 'OPTIONS' && req.url && req.url.startsWith('/healthz')) {
+      applyCors()
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+      res.writeHead(204)
+      res.end()
+      return
+    }
+
+    applyCors()
     res.writeHead(404)
     res.end('{"error":"not_found"}\n')
   })

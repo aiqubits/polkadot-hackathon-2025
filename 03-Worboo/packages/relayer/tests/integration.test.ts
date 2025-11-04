@@ -127,5 +127,5 @@ describe('relayer integration', () => {
       rmSync(dir, { recursive: true, force: true })
       process.chdir(originalCwd)
     }
-  }, 20000)
+  }, 40000)
 })

@@ -6,7 +6,11 @@
     "start": "ts-node src/relayer.ts",
     "test": "vitest run",
     "dev": "vitest watch --runInBand",
-    "status": "ts-node src/status.ts"
+    "status": "ts-node src/status.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"tests/**/*.ts\""
   },
   "keywords": [],
   "author": "",

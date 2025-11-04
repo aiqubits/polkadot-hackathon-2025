@@ -5,6 +5,7 @@
 - **Contracts**: `WorbooRegistry`, `WorbooToken`, `WorbooShop` deployed via Ignition module with roles wired (`packages/contracts/ignition/modules/WorbooModule.ts`).
 - **Frontend**: React app connects to Moonbase Alpha, fetches balances via `useWorbooPlayer`, and triggers purchases through the deployed contracts.
 - **Relayer**: `packages/relayer` package listens for `GameRecorded` events and mints WBOO rewards. Config validated by unit tests.
+- **Ops**: Dockerfile and PM2 ecosystem config added under packages/relayer/ for production deployments.
 - **Docs**: README, deployment guide, hackathon dossier, demo playbook, and roadmap updated for Moonbase + relayer workflow.
 
 ## Gaps Before “Full Flow” Demo
@@ -25,17 +26,25 @@
 
 | Task | Command |
 | --- | --- |
+| Monorepo lint | `npm run lint` |
 | Deploy contracts | `npx hardhat ignition deploy ./ignition/modules/WorbooModule.ts --network moonbase` |
 | Export addresses | `npm run export:addresses` (packages/contracts) |
 | Grant relayer role | `npx hardhat run --network moonbase scripts/grantGameMaster.ts <token> <relayer>` |
 | Run relayer | `npm run start` (packages/relayer) |
+| Docker build | docker build -f packages/relayer/Dockerfile -t worboo-relayer . |
+| Docker run | docker run --rm -p 8787:8787 -v D:\zWenbo\AI\Hackthon\polkadot-hackathon-2025\03-Worboo/packages/relayer/config:/app/packages/relayer/config -e RELAYER_CONFIG_PATH=/app/packages/relayer/config/relayer.config.json worboo-relayer |
+| PM2 (optional) | pm2 start packages/relayer/ecosystem.config.cjs |
 | Frontend tests | `npm test -- --watch=false --testPathPattern="(shop|contracts|words)"` |
 
 ## Contacts / Notes
 
-- Keep private keys in `.env` only; never commit.
+- Keep private keys in `.env`/config files only; never commit.
 - DEV faucet: https://faucet.moonbeam.network/
 - Block explorer: https://moonbase.moonscan.io/
 - For production: consider swapping to Moonbeam RPCs and revisiting gas estimates (Moonbase uses 1 gwei baseline).
 
 Continue iterating, and log major decisions back into this document or the roadmap so future teammates stay aligned. Good luck! 🟩🟨⬛
+
+
+
+

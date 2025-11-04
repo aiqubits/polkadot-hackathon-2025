@@ -92,11 +92,14 @@ sequenceDiagram
 From repository root:
 
 ```bash
+npm install --ignore-scripts
+# or install each workspace individually:
 npm install --prefix packages/contracts
+npm install --prefix packages/relayer
 npm install --ignore-scripts --prefix react-wordle
 ```
 
-> We skip husky hooks in the CRA app via `--ignore-scripts` because the hackathon workspace may not be a git repo.
+> The root install pulls in shared lint/format tooling. `--ignore-scripts` keeps Husky from running when the repo is checked out outside Git. If you still see Husky errors, set `HUSKY=0` (or `HUSKY_SKIP_INSTALL=1`) before installing.
 
 ### 3. Configure environment
 
@@ -157,34 +160,46 @@ cd packages/contracts
 npx hardhat run --network moonbase scripts/grantGameMaster.ts <tokenAddress> <relayerAddress>
 ```
 
-Then configure and launch the listener:
+Then create a config file (JSON) and launch the listener:
 
 ```bash
 cd ../relayer
-cp .env.example .env   # fill in RPC URL, private key, registry & token addresses
+cp config/relayer.config.json.example config/relayer.config.json
+# edit config/relayer.config.json with RPC URL, private key, registry & token addresses
 npm run start
 ```
 
-`packages/relayer/.env` fields:
+Config keys mirror the environment variables (which still work for quick overrides):
 
-```ini
-RELAYER_RPC_URL=https://rpc.api.moonbase.moonbeam.network
-RELAYER_PRIVATE_KEY=0xRELAYER_PRIVATE_KEY
-RELAYER_REGISTRY_ADDRESS=0x...
-RELAYER_TOKEN_ADDRESS=0x...
-RELAYER_REWARD_PER_WIN=10
-RELAYER_MAX_RETRIES=3
-RELAYER_BACKOFF_MS=1000
-RELAYER_CACHE_PATH=.cache/processed-events.jsonl
-RELAYER_HEALTH_PATH=.cache/health.json
-RELAYER_HEALTH_HOST=0.0.0.0
-RELAYER_HEALTH_PORT=8787
-RELAYER_LOG_FILE=.logs/worboo-relayer.log
-RELAYER_LOG_MAX_BYTES=5242880        # rotate when file exceeds 5 MB
-RELAYER_LOG_BACKUPS=5                # keep 5 rotated files
+```json
+{
+  "rpcUrl": "https://rpc.api.moonbase.moonbeam.network",
+  "privateKey": "0xRELAYER_PRIVATE_KEY",
+  "registryAddress": "0x...",
+  "tokenAddress": "0x...",
+  "rewardPerWin": "10",
+  "maxRetries": 3,
+  "backoffMs": 1000,
+  "cachePath": ".cache/processed-events.jsonl",
+  "cacheMaxEntries": 1000,
+  "healthPath": ".cache/health.json",
+  "healthHost": "0.0.0.0",
+  "healthCorsOrigin": "*",
+  "healthPort": 8787,
+  "logFilePath": ".logs/worboo-relayer.log",
+  "logMaxBytes": 5242880,
+  "logBackupCount": 5
+}
 ```
 
-The relayer watches `GameRecorded` events, persists processed hashes to disk (safe for restarts), and mints `WBOO` for victorious players using the reward amount defined in `.env`. The UI navbar displays relayer status so players see pending wins and successful mints in real time. To inspect relayer health from the CLI run:
+Set `RELAYER_CONFIG_PATH` if you store the file outside `packages/relayer/config/`.
+> Container deploy: `docker build -f packages/relayer/Dockerfile -t worboo-relayer .` then run with your mounted `relayer.config.json`. Process manager: `pm2 start packages/relayer/ecosystem.config.cjs`.
+
+Processed event caches are capped via `cacheMaxEntries` (or `RELAYER_CACHE_MAX_ENTRIES`); oldest entries are trimmed automatically to prevent unbounded growth while preserving restart safety. Use `RELAYER_LOG_HTTP_ENDPOINT` to forward JSON log lines to an external collector.
+
+Use `healthCorsOrigin: "disable"` (or `RELAYER_HEALTH_CORS_ORIGIN=disable`) if you need to omit the `Access-Control-Allow-Origin` header entirely.
+
+The relayer watches `GameRecorded` events, persists processed hashes to disk (safe for restarts), and mints `WBOO` for victorious players using the reward amount defined in the config. The UI navbar displays relayer status so players see pending wins and successful mints in real time. To inspect relayer health from the CLI run:
 
 ```bash
 cd packages/relayer
@@ -199,6 +214,7 @@ An HTTP endpoint is also exposed at `http://localhost:8787/healthz` (configurabl
 
 | Layer | Command | Notes |
 | --- | --- | --- |
+| Monorepo lint | `npm run lint` | Shared ESLint config covering the contracts and relayer packages. |
 | Smart contracts | `npm run test` (in `packages/contracts`) | Hardhat + ethers v6, deterministic tests for registry/token/shop. |
 | Frontend services | `npm test -- --watch=false --testPathPattern="(shop|contracts|words)"` | Runs the curated unit tests (shop utilities, contract config, word helpers). Legacy CRA tests currently require additional polyfills (see “Known Issues”). |
 | Relayer service | `npm test` (in `packages/relayer`) | Vitest suite covering config parsing, persistence store, and mint retry handler. |
@@ -262,10 +278,12 @@ Short term goals are tracked in [`doc/implementation-plan.md`](doc/implementatio
 
 - [Polkadot Hackathon README](doc/README%20-%20polkadot.md)
 - [Deployment Guide](doc/deployment-guide.md)
+- [部署指南（中文）](doc/deployment-guide.zh-CN.md)
 - [Demo Playbook](doc/demo-playbook.md)
 - [Post-MVP Roadmap](doc/roadmap-next.md)
 - [Testing Matrix & Coverage Checklist](doc/testing-matrix.md)
 - [Observability Guide](doc/observability.md)
+- [Indexer Scaffold](packages/indexer/README.md)
 - [Migrating Ethereum DApps to Polkadot – Technical Roadmap & Strategy (PDF)](doc/Migrating%20Ethereum%20DApps%20to%20Polkadot%20–%20Technical%20Roadmap%20%26%20Strategy.pdf)
 - [Moonbeam Docs](https://docs.moonbeam.network/)
 - [RainbowKit](https://www.rainbowkit.com/) / [wagmi](https://wagmi.sh/) references.
@@ -273,6 +291,15 @@ Short term goals are tracked in [`doc/implementation-plan.md`](doc/implementatio
 ---
 
 Made with 🟩🟨⬛ by the Worboo team for the Dot Your Future hackathon.
+
+
+
+
+
+
+
+
+
 
 
 
