@@ -8,11 +8,13 @@ import {
   useChainId,
 } from "wagmi";
 import { formatEther, createPublicClient, http } from "viem";
-import { getContractAddress } from "@/config/contracts";
+import {
+  getContractAddress,
+  stakingContractAbi as StakingContractAbi,
+  vDOTAbi,
+  votingTicketAbi as VotingTicketAbi,
+} from "@/config/contracts";
 import { getChainById } from "@/config/chains";
-import StakingContractAbi from "@/contracts/abis/StakingContract.json";
-import vDOTAbi from "@/contracts/abis/vDOT.json";
-import VotingTicketAbi from "@/contracts/abis/VotingTicket.json";
 
 /**
  * 用户抵押信息

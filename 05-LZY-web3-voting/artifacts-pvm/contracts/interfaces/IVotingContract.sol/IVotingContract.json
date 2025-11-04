@@ -1,0 +1,81 @@
+{
+  "_format": "hh-resolc-artifact-1",
+  "contractName": "IVotingContract",
+  "sourceName": "contracts/interfaces/IVotingContract.sol",
+  "abi": [
+    {
+      "inputs": [],
+      "name": "currentVotingPeriodId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "votingPeriodId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "correctYear",
+          "type": "uint256"
+        }
+      ],
+      "name": "resolveVotingPeriod",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "votingPeriodId",
+          "type": "uint256"
+        }
+      ],
+      "name": "votingPeriods",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "startTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "endTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "resolved",
+          "type": "bool"
+        },
+        {
+          "internalType": "uint256",
+          "name": "correctAnswerYear",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

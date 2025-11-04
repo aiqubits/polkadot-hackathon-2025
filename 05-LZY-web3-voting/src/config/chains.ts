@@ -117,6 +117,30 @@ export const moonbaseAlpha = defineChain({
 });
 
 /**
+ * PolkaVM Local Network Configuration
+ * For PolkaVM local development and testing
+ */
+export const polkavm = defineChain({
+  id: 420420420,
+  name: "PolkaVM Local",
+  network: "polkavm",
+  nativeCurrency: {
+    decimals: 18,
+    name: "PolkaVM Token",
+    symbol: "PVM",
+  },
+  rpcUrls: {
+    default: {
+      http: ["http://127.0.0.1:8545"],
+    },
+    public: {
+      http: ["http://127.0.0.1:8545"],
+    },
+  },
+  testnet: true,
+});
+
+/**
  * Hardhat Local Network Configuration
  * For local development and testing
  */
@@ -126,8 +150,8 @@ export const hardhat = defineChain({
   network: "hardhat",
   nativeCurrency: {
     decimals: 18,
-    name: "Ether",
-    symbol: "ETH",
+    name: "DOT",
+    symbol: "DOT",
   },
   rpcUrls: {
     default: {
@@ -147,6 +171,7 @@ export const supportedChains = [
   moonbaseAlpha,
   moonbeam,
   moonriver,
+  polkavm,
   hardhat,
 ] as const;
 
@@ -161,6 +186,8 @@ export function getChainById(chainId: number) {
       return moonbeam;
     case 1285:
       return moonriver;
+    case 420420420:
+      return polkavm;
     case 31337:
       return hardhat;
     default:

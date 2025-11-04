@@ -50,25 +50,27 @@ export function StakingHistory() {
 
   const getStatusInfo = (item: StakingHistoryItem) => {
     if (!item.active) {
-      return { text: "已解除", color: "text-gray-400" };
+      return { text: "Unstaked", color: "text-gray-400" };
     }
     if (item.canUnstake) {
-      return { text: "可解除", color: "text-green-400" };
+      return { text: "Can Unstake", color: "text-green-400" };
     }
-    return { text: "锁定中", color: "text-yellow-400" };
+    return { text: "Locked", color: "text-yellow-400" };
   };
 
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold text-white">抵押历史</h2>
-        <span className="text-xs text-white/60">链上数据 · 实时更新</span>
+        <h2 className="text-lg font-semibold text-white">Staking History</h2>
+        <span className="text-xs text-white/60">
+          On-chain data · Real-time updates
+        </span>
       </div>
 
       <div className="mt-4 space-y-4 text-sm text-white/70">
-        {loading && <p className="text-white">加载中...</p>}
+        {loading && <p className="text-white">Loading...</p>}
         {!loading && history.length === 0 && (
-          <p className="text-center text-white/50">暂无抵押记录</p>
+          <p className="text-center text-white/50">No staking records yet</p>
         )}
         {!loading &&
           history.map((item, index) => {
@@ -79,32 +81,34 @@ export function StakingHistory() {
                 className="rounded-2xl border border-white/10 bg-white/5 p-4"
               >
                 <div className="flex items-center justify-between text-xs text-white/50">
-                  <span>抵押 #{item.index + 1}</span>
+                  <span>Stake #{item.index + 1}</span>
                   <span className={status.color}>{status.text}</span>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-white/50">抵押数量</p>
+                    <p className="text-xs text-white/50">Staked Amount</p>
                     <p className="text-base font-semibold text-white">
                       {item.amount} vDOT
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-white/50">获得投票券</p>
+                    <p className="text-xs text-white/50">
+                      Voting Tickets Received
+                    </p>
                     <p className="text-base font-semibold text-white">
-                      {item.ticketsMinted} 张
+                      {item.ticketsMinted} tickets
                     </p>
                   </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-white/50">投票期ID</p>
+                    <p className="text-xs text-white/50">Voting Period ID</p>
                     <p className="text-sm text-white">#{item.votingPeriodId}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-white/50">抵押时间</p>
+                    <p className="text-xs text-white/50">Stake Time</p>
                     <p className="text-sm text-white">
                       {item.startTime.toLocaleDateString()}
                     </p>
@@ -115,8 +119,8 @@ export function StakingHistory() {
                   <div className="mt-3 rounded-lg bg-white/5 p-2">
                     <p className="text-xs text-white/60">
                       {item.canUnstake
-                        ? "✅ 投票期已开奖，可以解除抵押"
-                        : "⏳ 等待投票期开奖后才能解除抵押"}
+                        ? "✅ Voting period resolved, can unstake"
+                        : "⏳ Waiting for voting period reveal to unstake"}
                     </p>
                   </div>
                 )}
@@ -128,7 +132,7 @@ export function StakingHistory() {
       {!loading && history.length > 0 && (
         <div className="mt-4 rounded-lg bg-white/5 p-3 text-center">
           <p className="text-xs text-white/60">
-            总计 {history.length} 条抵押记录
+            Total {history.length} staking records
           </p>
         </div>
       )}

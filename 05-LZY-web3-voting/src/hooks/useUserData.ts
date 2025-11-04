@@ -8,82 +8,84 @@ import {
   useWatchContractEvent,
 } from "wagmi";
 import { useMemo, useState, useEffect } from "react";
-import { getContractAddress } from "@/config/contracts";
-import vDOTAbi from "@/contracts/abis/vDOT.json";
-import VotingTicketAbi from "@/contracts/abis/VotingTicket.json";
-import StakingContractAbi from "@/contracts/abis/StakingContract.json";
-import VotingContractAbi from "@/contracts/abis/VotingContract.json";
+import {
+  getContractAddress,
+  vDOTAbi,
+  votingTicketAbi as VotingTicketAbi,
+  stakingContractAbi as StakingContractAbi,
+  votingContractAbi as VotingContractAbi,
+} from "@/config/contracts";
 
 /**
- * 格式化大数字显示
+ * Format large number display
  */
 function formatNumber(value: bigint, decimals = 18): string {
   const divisor = BigInt(10 ** decimals);
   const wholePart = value / divisor;
   const fractionalPart = value % divisor;
 
-  // 转换为数字进行格式化
+  // Convert to number for formatting
   const wholeNumber = Number(wholePart);
   const fractionalNumber = Number(fractionalPart) / Number(divisor);
   const totalNumber = wholeNumber + fractionalNumber;
 
-  return new Intl.NumberFormat("zh-CN", {
+  return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(totalNumber);
 }
 
 /**
- * 用户数据接口
+ * User data interface
  */
 export interface UserData {
-  // 原生代币余额（ETH/DOT）
+  // Native token balance (DOT)
   nativeBalance: string;
-  // vDOT 余额
+  // vDOT balance
   vDOTBalance: string;
-  // 已抵押总量
+  // Total staked amount
   stakedAmount: string;
-  // 投票权（票券数量）
+  // Voting power (ticket count)
   votingPower: string;
-  // 票券余额
+  // Ticket balance
   ticketBalance: string;
-  // 是否已投票
+  // Whether user has voted
   hasVoted: boolean;
-  // 已铸造 vDOT（vDOT 余额 + 已抵押量）
+  // Total minted vDOT (vDOT balance + staked amount)
   totalVDOT: string;
-  // 加载状态
+  // Loading state
   isLoading: boolean;
-  // 错误状态
+  // Error state
   hasError: boolean;
-  // 错误信息
+  // Error message
   error: Error | null;
 }
 
 /**
- * 获取用户个人数据的 Hook
+ * Hook to get user personal data
  */
 export function useUserData(): UserData {
   const chainId = useChainId();
   const { address } = useAccount();
 
-  // 获取合约地址
+  // Get contract addresses
   const vDOTAddress = getContractAddress(chainId, "vDOT");
   const votingTicketAddress = getContractAddress(chainId, "VotingTicket");
   const stakingContractAddress = getContractAddress(chainId, "StakingContract");
   const votingContractAddress = getContractAddress(chainId, "VotingContract");
 
-  // 获取抵押详情
+  // Get staking details
   const stakeDetails = useUserStakeDetails();
 
-  // 读取原生代币余额（ETH/DOT）
+  // Read native token balance (DOT)
   const { data: nativeBalance } = useBalance({
     address,
     query: {
-      refetchInterval: 10000, // 每10秒刷新
+      refetchInterval: 10000, // Refresh every 10 seconds
     },
   });
 
-  // 读取用户 vDOT 余额
+  // Read user vDOT balance
   const {
     data: vDOTBalance,
     isLoading: isLoadingVDOT,
@@ -98,7 +100,7 @@ export function useUserData(): UserData {
     },
   });
 
-  // 读取用户票券余额
+  // Read user ticket balance
   const {
     data: ticketBalance,
     isLoading: isLoadingTickets,
@@ -113,7 +115,7 @@ export function useUserData(): UserData {
     },
   });
 
-  // 读取用户抵押记录数量
+  // Read user staking record count
   const {
     data: _stakeCount,
     isLoading: isLoadingStakeCount,
@@ -128,7 +130,7 @@ export function useUserData(): UserData {
     },
   });
 
-  // 读取用户投票记录数量
+  // Read user vote record count
   const {
     data: voteCount,
     isLoading: isLoadingVoteCount,
@@ -144,22 +146,22 @@ export function useUserData(): UserData {
     },
   });
 
-  // 监听 vDOT 转账事件
+  // Watch vDOT transfer events
   useWatchContractEvent({
     address: vDOTAddress,
     abi: vDOTAbi,
     eventName: "Transfer",
     args: {
-      from: address, // 监听用户相关的转账
+      from: address, // Watch transfers related to user
     },
     onLogs: (_logs) => {
-      console.log("检测到 vDOT 转账事件，刷新数据");
-      // 当有转账时，重新获取数据
-      // 这里可以触发重新获取，但由于 useReadContract 已经有 refetchInterval，会自动更新
+      console.log("Detected vDOT transfer event, refreshing data");
+      // When transfer occurs, refetch data
+      // Can trigger refetch here, but useReadContract already has refetchInterval, will auto-update
     },
   });
 
-  // 监听抵押事件
+  // Watch staking events
   useWatchContractEvent({
     address: stakingContractAddress,
     abi: StakingContractAbi,
@@ -168,13 +170,13 @@ export function useUserData(): UserData {
       user: address,
     },
     onLogs: (_logs) => {
-      console.log("检测到抵押事件，刷新数据");
-      // 当有抵押时，重新获取数据
-      // 这里可以触发重新获取，但由于 useReadContract 已经有 refetchInterval，会自动更新
+      console.log("Detected staking event, refreshing data");
+      // When staking occurs, refetch data
+      // Can trigger refetch here, but useReadContract already has refetchInterval, will auto-update
     },
   });
 
-  // 监听投票事件
+  // Watch voting events
   useWatchContractEvent({
     address: votingContractAddress,
     abi: VotingContractAbi,
@@ -183,13 +185,13 @@ export function useUserData(): UserData {
       voter: address,
     },
     onLogs: (_logs) => {
-      console.log("检测到投票事件，刷新数据");
-      // 当有投票时，重新获取数据
+      console.log("Detected voting event, refreshing data");
+      // When vote occurs, refetch data
       void refetchVoteCount();
     },
   });
 
-  // 计算用户数据
+  // Calculate user data
   const userData = useMemo(() => {
     const isLoading =
       isLoadingVDOT ??
@@ -204,7 +206,7 @@ export function useUserData(): UserData {
 
     const error = vDOTError ?? ticketError ?? stakeCountError ?? voteCountError;
 
-    // 如果没有连接钱包，返回默认值
+    // If wallet not connected, return default values
     if (!address) {
       return {
         nativeBalance: "0",
@@ -220,7 +222,7 @@ export function useUserData(): UserData {
       };
     }
 
-    // 如果正在加载或出错，返回加载状态
+    // If loading or error, return loading state
     if (isLoading || hasError) {
       return {
         nativeBalance: "0",
@@ -236,7 +238,7 @@ export function useUserData(): UserData {
       };
     }
 
-    // 格式化数据
+    // Format data
     const formattedNativeBalance = nativeBalance
       ? formatNumber(nativeBalance.value, nativeBalance.decimals)
       : "0";
@@ -249,17 +251,17 @@ export function useUserData(): UserData {
       ? formatNumber(ticketBalance as bigint)
       : "0";
 
-    // 使用真实的抵押数据
+    // Use real staking data
     const formattedStakedAmount = formatNumber(stakeDetails.totalStaked);
     const formattedVotingPower = formatNumber(stakeDetails.totalVotingPower);
 
-    // 计算已铸造 vDOT（vDOT 余额 + 已抵押量）
+    // Calculate total minted vDOT (vDOT balance + staked amount)
     const totalVDOTValue =
       (vDOTBalance ? (vDOTBalance as bigint) : BigInt(0)) +
       stakeDetails.totalStaked;
     const formattedTotalVDOT = formatNumber(totalVDOTValue);
 
-    // 检查是否已投票
+    // Check if user has voted
     const hasVoted = voteCount ? Number(voteCount) > 0 : false;
 
     return {
@@ -295,8 +297,8 @@ export function useUserData(): UserData {
 }
 
 /**
- * 获取用户抵押详情的 Hook
- * 用于计算真实的已抵押总量和投票权
+ * Hook to get user staking details
+ * Used to calculate real total staked amount and voting power
  */
 export function useUserStakeDetails() {
   const chainId = useChainId();
@@ -309,7 +311,7 @@ export function useUserStakeDetails() {
     isLoading: false,
   });
 
-  // 读取用户抵押记录数量
+  // Read user staking record count
   const { data: stakeCount, refetch: refetchStakeCount } = useReadContract({
     address: stakingContractAddress,
     abi: StakingContractAbi,
@@ -320,7 +322,7 @@ export function useUserStakeDetails() {
     },
   });
 
-  // 计算抵押详情
+  // Calculate staking details
   useEffect(() => {
     const fetchStakeDetails = async () => {
       if (!address || !stakeCount || Number(stakeCount) === 0) {
@@ -336,7 +338,7 @@ export function useUserStakeDetails() {
       setStakeDetails((prev) => ({ ...prev, isLoading: true }));
 
       try {
-        // 创建公共客户端
+        // Create public client
         const { createPublicClient, http } = await import("viem");
         const { getChainById } = await import("@/config/chains");
 
@@ -345,7 +347,7 @@ export function useUserStakeDetails() {
           transport: http(),
         });
 
-        // 遍历所有抵押记录
+        // Iterate through all staking records
         const stakePromises = [];
         for (let i = 0; i < Number(stakeCount); i++) {
           stakePromises.push(
@@ -358,7 +360,7 @@ export function useUserStakeDetails() {
           );
         }
 
-        // 等待所有抵押记录读取完成
+        // Wait for all staking records to be read
         const stakes = await Promise.all(stakePromises);
 
         let totalStaked = BigInt(0);
@@ -385,7 +387,7 @@ export function useUserStakeDetails() {
           isLoading: false,
         });
       } catch (error) {
-        console.error("获取抵押详情失败:", error);
+        console.error("Failed to fetch staking details:", error);
         setStakeDetails({
           totalStaked: BigInt(0),
           totalVotingPower: BigInt(0),

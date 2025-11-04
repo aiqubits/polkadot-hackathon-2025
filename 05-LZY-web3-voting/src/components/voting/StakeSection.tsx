@@ -34,22 +34,24 @@ export function StakeSection({ onStake, currentStaked }: StakeSectionProps) {
   return (
     <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-white">抵押 vDOT</h2>
+        <h2 className="text-white">Stake vDOT</h2>
         <div className="text-sm text-gray-300">
-          余额:{" "}
+          Balance:{" "}
           <span className="text-cyan-400">{mockBalance.toFixed(2)} vDOT</span>
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="mb-2 block text-sm text-gray-300">抵押数量</label>
+          <label className="mb-2 block text-sm text-gray-300">
+            Stake Amount
+          </label>
           <div className="relative">
             <Input
               type="number"
               value={stakeAmount}
               onChange={(e) => setStakeAmount(e.target.value)}
-              placeholder="输入抵押数量"
+              placeholder="Enter stake amount"
               className="border-white/20 bg-white/5 pr-16 text-white placeholder:text-gray-500"
               min="0"
               max={mockBalance}
@@ -98,19 +100,21 @@ export function StakeSection({ onStake, currentStaked }: StakeSectionProps) {
 
         <div className="space-y-2 rounded-lg bg-white/5 p-4 text-sm">
           <div className="flex justify-between text-gray-300">
-            <span>当前已抵押:</span>
+            <span>Currently Staked:</span>
             <span className="text-white">{currentStaked.toFixed(2)} vDOT</span>
           </div>
           <div className="flex justify-between text-gray-300">
-            <span>将获得投票权:</span>
+            <span>Will Get Voting Rights:</span>
             <span className="text-cyan-400">
-              {stakeAmount ? `+${parseFloat(stakeAmount).toFixed(2)}` : "0"} 票
+              {stakeAmount ? `+${parseFloat(stakeAmount).toFixed(2)}` : "0"}{" "}
+              votes
             </span>
           </div>
           <div className="flex justify-between border-t border-white/10 pt-2">
-            <span className="text-gray-300">总投票权:</span>
+            <span className="text-gray-300">Total Voting Rights:</span>
             <span className="text-white">
-              {(currentStaked + (parseFloat(stakeAmount) || 0)).toFixed(2)} 票
+              {(currentStaked + (parseFloat(stakeAmount) || 0)).toFixed(2)}{" "}
+              votes
             </span>
           </div>
         </div>
@@ -147,15 +151,16 @@ export function StakeSection({ onStake, currentStaked }: StakeSectionProps) {
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 ></path>
               </svg>
-              交易处理中...
+              Processing transaction...
             </span>
           ) : (
-            "确认抵押"
+            "Confirm Stake"
           )}
         </Button>
 
         <p className="text-center text-xs text-gray-400">
-          * 抵押后可随时解除，解除需要等待 7 天锁定期
+          * Can unstake at any time after staking, unstaking requires 7-day lock
+          period
         </p>
       </div>
     </div>

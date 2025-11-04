@@ -18,7 +18,7 @@ import { useContractStats } from "@/hooks/useContractStats";
 export default function Home() {
   const [communityJoined, setCommunityJoined] = useState(false);
 
-  // 获取链上统计数据
+  // Get on-chain statistics
   const contractStats = useContractStats();
 
   const {
@@ -27,34 +27,36 @@ export default function Home() {
     isLoading: connecting,
   } = useWalletContext();
 
-  const connectWallet = () => connect("evm"); // 默认连接 EVM 钱包
+  const connectWallet = () => connect("evm"); // Default to EVM wallet
 
   const tasks = useMemo(
     () => [
       {
-        label: "连接钱包",
+        label: "Connect Wallet",
         done: walletConnected,
-        description: "切换到 Moonbeam 网络并授权扩展。",
+        description: "Switch to Moonbeam network and authorize extension.",
       },
       {
-        label: "铸造 vDOT",
+        label: "Mint vDOT",
         done: false,
-        description: "通过 SLPx 桥完成 DOT → vDOT 兑换。",
+        description: "Complete DOT → vDOT exchange via SLPx bridge.",
       },
       {
-        label: "抵押 vDOT",
+        label: "Stake vDOT",
         done: false,
-        description: "在平台合约内锁定 vDOT 获得票券。",
+        description: "Lock vDOT in platform contract to get voting tickets.",
       },
       {
-        label: "提交预测",
+        label: "Submit Prediction",
         done: false,
-        description: "选择年份并确认交易，等待 Chainlink 开奖。",
+        description:
+          "Select year and confirm transaction, wait for Chainlink reveal.",
       },
       {
-        label: "加入 TG 社区",
+        label: "Join TG Community",
         done: communityJoined,
-        description: "进入 Telegram 群获取开奖提醒与最新活动。",
+        description:
+          "Join Telegram group for reveal alerts and latest activities.",
       },
     ],
     [walletConnected, communityJoined],
@@ -63,27 +65,27 @@ export default function Home() {
   const heroMetrics = useMemo(
     () => [
       {
-        label: "累计铸造",
+        label: "Total Minted",
         value: contractStats.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : contractStats.hasError
-            ? "数据错误"
+            ? "Data Error"
             : `${contractStats.totalMinted} vDOT`,
       },
       {
-        label: "抵押总量",
+        label: "Total Staked",
         value: contractStats.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : contractStats.hasError
-            ? "数据错误"
+            ? "Data Error"
             : `${contractStats.totalStaked} vDOT`,
       },
       {
-        label: "参与地址",
+        label: "Participating Addresses",
         value: contractStats.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : contractStats.hasError
-            ? "数据错误"
+            ? "Data Error"
             : contractStats.participantCount,
       },
     ],
@@ -96,15 +98,17 @@ export default function Home() {
         <section className="relative mb-16 grid gap-10 lg:grid-cols-[2fr,1fr] lg:items-center">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs tracking-[0.2em] text-white/60 uppercase">
-              BTC何时会被竞争链超越
+              When Will BTC Be Surpassed by Competitors
             </span>
             <h1 className="mt-6 text-4xl leading-tight font-semibold md:text-5xl lg:text-6xl">
-              一次点击完成 DOT 跨链抵押，预测 BTC 的未来拐点
+              Complete DOT Cross-Chain Staking with One Click, Predict
+              BTC&apos;s Future Turning Point
             </h1>
             <p className="mt-4 max-w-3xl text-base text-white/70 md:text-lg">
-              连接 Moonbeam 钱包，自动调用 Bifrost SLPx 铸造
-              vDOT，锁定资产换取投票券，Chainlink
-              预言机实时监听竞链市值并在触发时发放预测者 NFT。
+              Connect Moonbeam wallet, automatically call Bifrost SLPx to mint
+              vDOT, lock assets to get voting tickets, Chainlink oracle monitors
+              competitor market cap in real-time and distributes prediction NFTs
+              when triggered.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-4">
@@ -113,7 +117,7 @@ export default function Home() {
                   asChild
                   className="border-0 bg-gradient-to-r from-cyan-500 to-purple-500 px-8 text-white hover:from-cyan-600 hover:to-purple-600"
                 >
-                  <Link href="/mint">前往铸造页面</Link>
+                  <Link href="/mint">Go to Mint Page</Link>
                 </Button>
               ) : (
                 <Button
@@ -121,7 +125,7 @@ export default function Home() {
                   disabled={connecting}
                   className="border-0 bg-gradient-to-r from-cyan-500 to-purple-500 px-8 text-white hover:from-cyan-600 hover:to-purple-600"
                 >
-                  {connecting ? "连接中..." : "连接钱包"}
+                  {connecting ? "Connecting..." : "Connect Wallet"}
                 </Button>
               )}
               <Button
@@ -129,14 +133,14 @@ export default function Home() {
                 variant="outline"
                 className="border-white/30 bg-white/5 px-8 text-white hover:bg-white/10"
               >
-                <Link href="#flow">了解完整流程</Link>
+                <Link href="#flow">Learn Full Process</Link>
               </Button>
             </div>
 
             <div className="mt-8 flex flex-wrap items-center gap-6 text-sm text-white/60">
               <div className="flex items-center gap-2">
                 <span className="flex h-2 w-2 rounded-full bg-green-400" />
-                链上状态正常
+                Chain Status Normal
               </div>
               <div className="flex items-center gap-2">
                 <svg
@@ -152,14 +156,14 @@ export default function Home() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                Chainlink 监听频次：每日国际标准时间00:00更新
+                Chainlink Update Frequency: Daily at 00:00 UTC
               </div>
             </div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-white/10 p-6 backdrop-blur-xl">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-white/70">实时进度</p>
+              <p className="text-sm text-white/70">Real-time Progress</p>
               <span className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70">
                 <span className="flex h-2 w-2 animate-pulse rounded-full bg-cyan-400" />
                 Live
@@ -180,10 +184,10 @@ export default function Home() {
             </div>
             <p className="mt-6 text-xs text-white/50">
               {contractStats.hasError
-                ? "⚠️ 链上数据读取失败，请检查网络连接或切换网络"
+                ? "⚠️ Failed to read on-chain data, please check network connection or switch network"
                 : contractStats.isLoading
-                  ? "🔄 正在同步链上数据..."
-                  : "✅ 数据实时读取自智能合约，每10秒自动更新"}
+                  ? "🔄 Syncing on-chain data..."
+                  : "✅ Data is read in real-time from smart contracts, auto-updated every 10 seconds"}
             </p>
           </div>
         </section>
@@ -216,16 +220,16 @@ export default function Home() {
       <footer className="border-t border-white/10 bg-black/20">
         <div className="container mx-auto max-w-7xl px-4 py-10 text-sm text-white/60">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <p>© 2025 BTC 未来预测平台 · Moonbeam & Bifrost 联合支持</p>
+            <p>© 2025 Web3 Voting · Powered by Moonbeam & Bifrost</p>
             <div className="flex flex-wrap items-center gap-4 text-xs">
               <Link href="/docs/security" className="hover:text-white">
-                安全审计报告
+                Security Audit Report
               </Link>
               <Link href="/docs/tokenomics" className="hover:text-white">
-                经济模型
+                Tokenomics
               </Link>
               <Link href="/docs/support" className="hover:text-white">
-                联系支持
+                Contact Support
               </Link>
             </div>
           </div>

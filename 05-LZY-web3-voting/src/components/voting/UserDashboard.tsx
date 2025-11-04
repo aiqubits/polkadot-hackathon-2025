@@ -8,11 +8,11 @@ export function UserDashboard() {
     {
       label: "Moonbeam DOT",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
-          : `${userData.nativeBalance} ETH`,
-      helper: "钱包余额",
+          ? "Data Error"
+          : `${userData.nativeBalance} DOT`,
+      helper: "Wallet balance",
       iconColor: "text-cyan-300",
       icon: (
         <svg
@@ -31,13 +31,13 @@ export function UserDashboard() {
       ),
     },
     {
-      label: "已铸造 vDOT",
+      label: "Minted vDOT",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
+          ? "Data Error"
           : `${userData.totalVDOT} vDOT`,
-      helper: "跨链成功",
+      helper: "Cross-chain successful",
       iconColor: "text-purple-300",
       icon: (
         <svg
@@ -74,13 +74,13 @@ export function UserDashboard() {
       ),
     },
     {
-      label: "已抵押",
+      label: "Staked",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
+          ? "Data Error"
           : `${userData.stakedAmount} vDOT`,
-      helper: "锁定合约",
+      helper: "Locked in contract",
       iconColor: "text-emerald-300",
       icon: (
         <svg
@@ -99,13 +99,13 @@ export function UserDashboard() {
       ),
     },
     {
-      label: "投票权",
+      label: "Voting Power",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
-          : `${userData.votingPower} 票`,
-      helper: "可用票券",
+          ? "Data Error"
+          : `${userData.votingPower} votes`,
+      helper: "Available tickets",
       iconColor: "text-amber-300",
       icon: (
         <svg
@@ -130,13 +130,13 @@ export function UserDashboard() {
       ),
     },
     {
-      label: "票券余额",
+      label: "Ticket Balance",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
-          : `${userData.ticketBalance} 张`,
-      helper: "待投票",
+          ? "Data Error"
+          : `${userData.ticketBalance} tickets`,
+      helper: "Pending vote",
       iconColor: "text-pink-300",
       icon: (
         <svg
@@ -167,15 +167,17 @@ export function UserDashboard() {
       ),
     },
     {
-      label: "投票状态",
+      label: "Vote Status",
       value: userData.isLoading
-        ? "加载中..."
+        ? "Loading..."
         : userData.hasError
-          ? "数据错误"
+          ? "Data Error"
           : userData.hasVoted
-            ? "已提交"
-            : "待参与",
-      helper: userData.hasVoted ? "等待开奖" : "完成抵押即可投票",
+            ? "Submitted"
+            : "Pending",
+      helper: userData.hasVoted
+        ? "Waiting for reveal"
+        : "Complete staking to vote",
       iconColor: userData.hasVoted ? "text-green-300" : "text-yellow-300",
       icon: userData.hasVoted ? (
         <svg
@@ -217,10 +219,11 @@ export function UserDashboard() {
             id="dashboard-title"
             className="polkadot-gradient-text font-[family-name:var(--font-heading)] text-3xl font-bold"
           >
-            我的控制台
+            My Dashboard
           </h2>
           <p className="mt-2 text-sm text-gray-300">
-            已铸造与抵押数据实时同步，所有票券均与链上资产 1:1 绑定。
+            Minted and staked data syncs in real-time, all tickets are 1:1 bound
+            to on-chain assets.
           </p>
         </div>
         <div className="glass-effect flex items-center gap-2 rounded-full border border-white/10 px-5 py-2.5 text-xs transition-all duration-300 hover:border-[#e6007a]/50 hover:shadow-lg hover:shadow-[#e6007a]/20">
@@ -235,10 +238,10 @@ export function UserDashboard() {
           />
           <span className="font-semibold text-white">
             {userData.isLoading
-              ? "同步中..."
+              ? "Syncing..."
               : userData.hasError
-                ? "数据错误"
-                : "状态正常"}
+                ? "Data Error"
+                : "Status Normal"}
           </span>
         </div>
       </div>

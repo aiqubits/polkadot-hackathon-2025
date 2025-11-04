@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { createPublicClient, http, type PublicClient } from "viem";
 import { useChainId } from "wagmi";
 import { getChainById } from "@/config/chains";
-import { getContractAddress } from "@/config/contracts";
-import vDOTAbi from "@/contracts/abis/vDOT.json";
-import StakingContractAbi from "@/contracts/abis/StakingContract.json";
+import {
+  getContractAddress,
+  vDOTAbi,
+  stakingContractAbi as StakingContractAbi,
+} from "@/config/contracts";
 
 /**
  * 格式化大数字显示

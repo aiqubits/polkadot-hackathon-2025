@@ -14,36 +14,36 @@ interface VoteSectionProps {
 const voteOptions = [
   {
     value: 3,
-    label: "3 年内",
-    description: "2028 年前被超越",
+    label: "Within 3 years",
+    description: "Surpassed before 2028",
     color: "from-[#ff4d8a] to-[#e6007a]",
     glow: "shadow-[#e6007a]/50",
   },
   {
     value: 5,
-    label: "5 年内",
-    description: "2030 年前被超越",
+    label: "Within 5 years",
+    description: "Surpassed before 2030",
     color: "from-[#e6007a] to-[#552bbf]",
     glow: "shadow-[#552bbf]/50",
   },
   {
     value: 10,
-    label: "10 年内",
-    description: "2035 年前被超越",
+    label: "Within 10 years",
+    description: "Surpassed before 2035",
     color: "from-[#552bbf] to-[#00b2ff]",
     glow: "shadow-[#00b2ff]/50",
   },
   {
     value: 20,
-    label: "20 年内",
-    description: "2045 年前被超越",
+    label: "Within 20 years",
+    description: "Surpassed before 2045",
     color: "from-[#00b2ff] to-[#56f39a]",
     glow: "shadow-[#56f39a]/50",
   },
   {
     value: 99,
-    label: "永不会被超越",
-    description: "BTC 将保持领先",
+    label: "Never Surpassed",
+    description: "BTC will remain leading",
     color: "from-[#56f39a] to-[#e6007a]",
     glow: "shadow-[#e6007a]/50",
   },
@@ -86,8 +86,10 @@ export function VoteSection({
               />
             </svg>
           </div>
-          <h3 className="mb-2 text-xl text-white">投票成功!</h3>
-          <p className="text-gray-300">感谢您的参与，您的预测已记录</p>
+          <h3 className="mb-2 text-xl text-white">Vote Successful!</h3>
+          <p className="text-gray-300">
+            Thank you for participating, your prediction has been recorded
+          </p>
         </div>
       </div>
     );
@@ -96,7 +98,7 @@ export function VoteSection({
   return (
     <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-white">参与投票</h2>
+        <h2 className="text-white">Participate in Voting</h2>
         <div className="flex items-center space-x-2">
           <svg
             className="h-5 w-5 text-purple-400"
@@ -112,7 +114,8 @@ export function VoteSection({
             />
           </svg>
           <span className="text-sm text-gray-300">
-            可用投票权: <span className="text-purple-400">{votingPower}</span>
+            Available Voting Rights:{" "}
+            <span className="text-purple-400">{votingPower}</span>
           </span>
         </div>
       </div>
@@ -132,12 +135,15 @@ export function VoteSection({
               d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
             />
           </svg>
-          <p className="text-yellow-300">您需要先抵押 vDOT 以获得投票权</p>
+          <p className="text-yellow-300">
+            You need to stake vDOT first to get voting rights
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="mb-4 text-sm text-gray-300">
-            您认为比特币 (BTC) 何时会被其他竞争链超越？
+            When do you think Bitcoin (BTC) will be surpassed by other competing
+            chains?
           </p>
 
           <RadioGroup value={selectedOption} onValueChange={setSelectedOption}>
@@ -180,11 +186,12 @@ export function VoteSection({
 
           <div className="space-y-2 rounded-lg bg-white/5 p-4 text-sm">
             <div className="flex justify-between text-gray-300">
-              <span>您的投票权重:</span>
-              <span className="text-white">{votingPower} 票</span>
+              <span>Your Voting Weight:</span>
+              <span className="text-white">{votingPower} votes</span>
             </div>
             <p className="text-xs text-gray-400">
-              * 投票后无法更改，请谨慎选择
+              * Votes cannot be changed after submission, please choose
+              carefully
             </p>
           </div>
 
@@ -215,10 +222,10 @@ export function VoteSection({
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                投票中...
+                Voting...
               </span>
             ) : (
-              "提交投票"
+              "Submit Vote"
             )}
           </Button>
         </div>

@@ -9,13 +9,13 @@ import { WalletProvider } from "@/contexts/WalletContext";
 import { HeaderWithWallet } from "@/components/voting/HeaderWithWallet";
 
 export const metadata: Metadata = {
-  title: "Web3 Voting - BTC Future Prediction",
+  title: "Web3 Voting",
   description:
     "Decentralized voting platform on Moonbeam & Bifrost powered by Chainlink",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-// Polkadot 风格字体系统
+// Polkadot-style font system
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",

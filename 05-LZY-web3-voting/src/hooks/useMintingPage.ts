@@ -11,8 +11,7 @@ import {
   useWriteContract,
 } from "wagmi";
 import { parseEther, formatEther } from "viem";
-import { getContractAddress } from "@/config/contracts";
-import vDOTAbi from "@/contracts/abis/vDOT.json";
+import { getContractAddress, vDOTAbi } from "@/config/contracts";
 
 export function useMintingPage() {
   const { address } = useAccount();
@@ -23,7 +22,7 @@ export function useMintingPage() {
   // 获取合约地址
   const vDOTAddress = getContractAddress(chainId, "vDOT");
 
-  // 获取 ETH 余额
+  // 获取 DOT 余额
   const { data: balance } = useBalance({
     address,
     query: {
@@ -42,13 +41,27 @@ export function useMintingPage() {
     },
   });
 
-  // 发送交易 (用于存入ETH)
+  // 发送交易 (用于存入DOT)
   const {
     sendTransaction,
     isPending,
     error,
     data: hash,
-  } = useSendTransaction();
+  } = useSendTransaction({
+    mutation: {
+      onError: (error) => {
+        console.error("Deposit transaction error:", error);
+        // Log detailed error information for debugging
+        if (error.message?.includes("circuit breaker")) {
+          console.error("Circuit breaker error detected. Possible causes:");
+          console.error("1. RPC node temporarily unavailable");
+          console.error("2. Request rate limit exceeded");
+          console.error("3. Network connectivity issues");
+          console.error("4. Wallet provider RPC endpoint issues");
+        }
+      },
+    },
+  });
 
   // 写入合约 (用于redeem vDOT)
   const {
@@ -77,7 +90,7 @@ export function useMintingPage() {
     return parseFloat(amount).toFixed(4);
   }, [amount]);
 
-  // 存入 ETH 铸造 vDOT
+  // 存入 DOT 铸造 vDOT
   const deposit = () => {
     if (!address) {
       throw new Error("请先连接钱包");
@@ -87,13 +100,23 @@ export function useMintingPage() {
       throw new Error("请输入有效的数量");
     }
 
-    sendTransaction({
-      to: vDOTAddress,
-      value: parseEther(amount), // 发送 ETH
-    });
+    console.log("🚀 Starting deposit transaction...");
+    console.log("  - Amount:", amount, "DOT");
+    console.log("  - To address:", vDOTAddress);
+    console.log("  - Chain ID:", chainId);
+
+    try {
+      sendTransaction({
+        to: vDOTAddress,
+        value: parseEther(amount), // 发送 DOT 到合约地址触发 receive 函数
+      });
+    } catch (error) {
+      console.error("❌ Error in deposit function:", error);
+      throw error;
+    }
   };
 
-  // Redeem vDOT 赎回 ETH
+  // Redeem vDOT 赎回 DOT
   const redeem = () => {
     if (!address) {
       throw new Error("请先连接钱包");

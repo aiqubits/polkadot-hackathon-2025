@@ -44,7 +44,7 @@ export function WalletButton() {
           variant="outline"
           className="border-white/20 bg-white/5 text-white hover:bg-white/10"
         >
-          断开
+          Disconnect
         </Button>
       </div>
     );
@@ -57,14 +57,14 @@ export function WalletButton() {
           disabled={isLoading}
           className="border-0 bg-gradient-to-r from-cyan-500 to-purple-500 text-white hover:from-cyan-600 hover:to-purple-600"
         >
-          {isLoading ? "连接中..." : "连接钱包"}
+          {isLoading ? "Connecting..." : "Connect Wallet"}
         </Button>
       </DialogTrigger>
       <DialogContent className="border-white/10 bg-slate-950/95 text-white sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>选择钱包类型</DialogTitle>
+          <DialogTitle>Select Wallet Type</DialogTitle>
           <DialogDescription className="text-gray-400">
-            根据你要使用的网络选择钱包类型
+            Choose wallet type based on the network you want to use
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -84,15 +84,15 @@ export function WalletButton() {
               </div>
               <div>
                 <h3 className="font-semibold text-white">
-                  EVM 钱包 (Moonbeam)
+                  EVM Wallet (Moonbeam)
                 </h3>
                 <p className="text-sm text-gray-400">
-                  MetaMask, WalletConnect 等
+                  MetaMask, WalletConnect, etc.
                 </p>
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              用于 Moonbeam 网络的 EVM 兼容钱包
+              EVM-compatible wallets for Moonbeam network
             </p>
           </button>
 
@@ -118,7 +118,7 @@ export function WalletButton() {
               </div>
               <div>
                 <h3 className="font-semibold text-white">
-                  Substrate 钱包 (Bifrost)
+                  Substrate Wallet (Bifrost)
                 </h3>
                 <p className="text-sm text-gray-400">
                   Polkadot.js, Talisman, SubWallet
@@ -126,7 +126,7 @@ export function WalletButton() {
               </div>
             </div>
             <p className="text-xs text-gray-500">
-              用于 Bifrost 和其他 Polkadot 生态链
+              For Bifrost and other Polkadot ecosystem chains
             </p>
           </button>
         </div>

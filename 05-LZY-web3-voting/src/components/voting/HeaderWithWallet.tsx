@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navItems = [
-  { label: "铸造", href: "/mint" },
-  { label: "抵押", href: "/stake" },
-  { label: "投票", href: "/vote" },
-  { label: "开奖", href: "/reveal" },
+  { label: "Mint", href: "/mint" },
+  { label: "Stake", href: "/stake" },
+  { label: "Vote", href: "/vote" },
+  { label: "Reveal", href: "/reveal" },
 ];
 
 const networks = [
@@ -49,7 +49,7 @@ export function HeaderWithWallet() {
             </div>
             <div className="hidden flex-col sm:flex">
               <span className="polkadot-gradient-text font-[family-name:var(--font-heading)] text-base font-bold">
-                BTC 未来预测
+                Web3 Voting
               </span>
               <span className="text-xs text-gray-300">
                 Moonbeam × Bifrost × Chainlink
@@ -92,7 +92,7 @@ export function HeaderWithWallet() {
                   variant="ghost"
                   size="icon"
                   className="text-white hover:bg-white/10"
-                  aria-label="打开菜单"
+                  aria-label="Open Menu"
                 >
                   <svg
                     className="h-6 w-6"
@@ -129,7 +129,7 @@ export function HeaderWithWallet() {
                     </div>
                     <div className="flex flex-col">
                       <span className="text-sm font-semibold text-white">
-                        BTC 未来预测
+                        Web3 Voting
                       </span>
                       <span className="text-xs text-white/60">
                         Moonbeam · Bifrost · Chainlink
@@ -166,8 +166,9 @@ export function HeaderWithWallet() {
 
                   <div className="mt-auto px-6 pb-10">
                     <p className="mt-6 text-xs text-white/50">
-                      数据实时同步自 Moonbeam、Bifrost 与
-                      Chainlink，随时掌握跨链与开奖进度。
+                      Data is synchronized in real-time from Moonbeam, Bifrost,
+                      and Chainlink, keeping track of cross-chain and reveal
+                      progress at all times.
                     </p>
                   </div>
                 </div>

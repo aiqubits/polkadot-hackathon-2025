@@ -19,7 +19,7 @@ export default function RevealPage() {
 
   const connectWallet = () => connect("evm");
 
-  // 获取 BTCOracle 数据（降低查询频率：30秒）
+  // Get BTCOracle data (reduce query frequency: 30 seconds)
   const {
     latestSnapshot,
     votingPeriod,
@@ -30,7 +30,7 @@ export default function RevealPage() {
     snapshotCount,
   } = useBTCOracle(1);
 
-  // BTC 价格查询状态
+  // BTC price query status
   const [isQueryingPrice, setIsQueryingPrice] = React.useState(false);
   const [isWaitingConfirmation, setIsWaitingConfirmation] =
     React.useState(false);
@@ -44,25 +44,25 @@ export default function RevealPage() {
   } | null>(null);
   const [queryError, setQueryError] = React.useState<string | null>(null);
 
-  // 手动拍摄市场快照（包含BTC价格查询）
+  // Manually take market snapshot (includes BTC price query)
   const { writeContractAsync: takeMarketSnapshot } = useWriteContract({
     mutation: {
       onSuccess: (hash) => {
-        console.log("市场快照交易已提交，交易哈希:", hash);
+        console.log("Market snapshot transaction submitted, tx hash:", hash);
         setPendingTxHash(hash);
         setIsWaitingConfirmation(true);
       },
       onError: (error) => {
-        console.error("市场快照创建失败:", error);
+        console.error("Market snapshot creation failed:", error);
         setIsQueryingPrice(false);
         setIsWaitingConfirmation(false);
         setPendingTxHash(null);
-        setQueryError("交易提交失败，请重试");
+        setQueryError("Transaction submission failed, please retry");
       },
     },
   });
 
-  // 等待交易确认
+  // Wait for transaction confirmation
   const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash: pendingTxHash ?? undefined,
     query: {
@@ -70,15 +70,15 @@ export default function RevealPage() {
     },
   });
 
-  // 监听交易确认状态
+  // Listen for transaction confirmation status
   React.useEffect(() => {
     if (isConfirmed && isWaitingConfirmation) {
-      console.log("交易已确认！");
-      // 设置成功状态
+      console.log("Transaction confirmed!");
+      // Set success status
       setLastPriceQuery({
-        price: "快照已创建",
+        price: "Snapshot created",
         timestamp: Date.now(),
-        marketCap: "数据已存储到区块链",
+        marketCap: "Data stored on blockchain",
       });
       setQueryError(null);
       setIsQueryingPrice(false);
@@ -87,18 +87,18 @@ export default function RevealPage() {
     }
   }, [isConfirmed, isWaitingConfirmation]);
 
-  // 拍摄市场快照的处理函数（包含BTC价格查询和存储）
+  // Handler function for taking market snapshot (includes BTC price query and storage)
   const handleQueryBTCPrice = async () => {
     setIsQueryingPrice(true);
-    setQueryError(null); // 清除之前的错误
+    setQueryError(null); // Clear previous errors
 
     try {
-      // 如果钱包未连接，先连接钱包
+      // If wallet not connected, connect first
       if (!walletConnected) {
-        console.log("钱包未连接，正在连接...");
+        console.log("Wallet not connected, connecting...");
         await connectWallet();
 
-        // 等待连接状态更新，最多等待5秒
+        // Wait for connection status update, max 5 seconds
         let retryCount = 0;
         while (!walletConnected && retryCount < 10) {
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -106,34 +106,38 @@ export default function RevealPage() {
         }
 
         if (!walletConnected) {
-          throw new Error("钱包连接失败，请确保 MetaMask 已安装并解锁");
+          throw new Error(
+            "Wallet connection failed, please ensure MetaMask is installed and unlocked",
+          );
         }
       }
 
-      console.log("开始拍摄市场快照（包含BTC价格查询）...");
-      // 调用 takeMarketSnapshot 函数，拍摄当前市场快照
+      console.log("Starting market snapshot (includes BTC price query)...");
+      // Call takeMarketSnapshot function to take current market snapshot
       await takeMarketSnapshot({
         address: btcOracleAddress,
         abi: btcOracleAbi,
         functionName: "takeMarketSnapshot",
-        args: [1], // 投票期ID为1
+        args: [1], // Voting period ID is 1
       });
 
-      // 注意：成功状态将在交易确认后通过 useEffect 设置
+      // Note: Success status will be set via useEffect after transaction confirmation
     } catch (error) {
-      console.error("拍摄市场快照失败:", error);
+      console.error("Market snapshot failed:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "拍摄快照失败，请重试";
+        error instanceof Error
+          ? error.message
+          : "Snapshot failed, please retry";
       setQueryError(errorMessage);
     } finally {
       setIsQueryingPrice(false);
     }
   };
 
-  // 获取用户投票历史功能（仅在需要时调用，不自动轮询）
+  // Get user voting history function (only called when needed, no auto polling)
   const { getUserVotingHistory } = useVotingContract();
 
-  // 用户投票历史数据（需要异步加载）
+  // User voting history data (needs async loading)
   const [userVotingHistory, setUserVotingHistory] = React.useState<
     Array<{
       predictedYear: number;
@@ -144,23 +148,23 @@ export default function RevealPage() {
     }>
   >([]);
 
-  // 加载用户投票历史（只在钱包连接且投票期已开奖时加载）
+  // Load user voting history (only when wallet connected and voting period resolved)
   React.useEffect(() => {
     if (walletConnected && getUserVotingHistory && votingPeriod?.resolved) {
       void getUserVotingHistory().then(setUserVotingHistory);
     }
   }, [walletConnected, getUserVotingHistory, votingPeriod?.resolved]);
 
-  // Oracle 状态
+  // Oracle status
   const oracleStatus = useMemo(() => {
     const state = votingPeriod?.resolved
-      ? "已开奖"
+      ? "Resolved"
       : canTakeSnapshot
-        ? "等待快照"
-        : "监听中";
+        ? "Waiting for snapshot"
+        : "Monitoring";
 
     const lastCheck = lastSnapshotTime
-      ? new Date(lastSnapshotTime * 1000).toLocaleString("zh-CN", {
+      ? new Date(lastSnapshotTime * 1000).toLocaleString("en-US", {
           timeZone: "UTC",
           year: "numeric",
           month: "2-digit",
@@ -168,10 +172,10 @@ export default function RevealPage() {
           hour: "2-digit",
           minute: "2-digit",
         })
-      : "暂无数据";
+      : "No data";
 
     const nextCheck = nextSnapshotTime
-      ? new Date(nextSnapshotTime * 1000).toLocaleString("zh-CN", {
+      ? new Date(nextSnapshotTime * 1000).toLocaleString("en-US", {
           timeZone: "UTC",
           year: "numeric",
           month: "2-digit",
@@ -179,13 +183,13 @@ export default function RevealPage() {
           hour: "2-digit",
           minute: "2-digit",
         })
-      : "暂无数据";
+      : "No data";
 
     return {
       state,
       lastCheck,
       nextCheck,
-      triggerCondition: "任一竞争链市值 ≥ BTC",
+      triggerCondition: "Any competitor market cap ≥ BTC",
       snapshotCount: snapshotCount || 0,
     };
   }, [
@@ -196,25 +200,26 @@ export default function RevealPage() {
     snapshotCount,
   ]);
 
-  // 获奖者列表（基于用户投票历史）
+  // Winners list (based on user voting history)
   const winners = useMemo(() => {
     if (!userVotingHistory || !votingPeriod?.resolved) return [];
 
     return userVotingHistory
       .filter((vote) => {
-        // 只显示预测正确的投票
+        // Only show correctly predicted votes
         return (
           vote.votingPeriodId === 1 &&
           vote.predictedYear === votingPeriod.correctAnswerYear
         );
       })
-      .slice(0, 10) // 最多显示10个
+      .slice(0, 10) // Show at most 10
       .map((vote, index) => ({
         address: walletAddress
           ? `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`
-          : "未连接",
-        reward: index === 0 ? "传奇 NFT" : index < 3 ? "稀有 NFT" : "普通 NFT",
-        option: vote.predictedYear === 0 ? "永不会" : `${vote.predictedYear}年`,
+          : "Not connected",
+        reward:
+          index === 0 ? "Legendary NFT" : index < 3 ? "Rare NFT" : "Common NFT",
+        option: vote.predictedYear === 0 ? "Never" : `${vote.predictedYear}`,
       })) as Array<{
       address: string;
       reward: string;
@@ -222,42 +227,42 @@ export default function RevealPage() {
     }>;
   }, [userVotingHistory, votingPeriod, walletAddress]);
 
-  // 时间线数据
+  // Timeline data
   const timeline = useMemo(() => {
     const events = [];
 
-    // 添加最新快照事件
+    // Add latest snapshot event
     if (latestSnapshot) {
       const winningCompetitor = competitors[latestSnapshot.winningCompetitorId];
       const resultText =
         latestSnapshot.result === 1
-          ? `${winningCompetitor?.name ?? "竞争链"}市值超过 BTC`
-          : "BTC 市值保持领先";
+          ? `${winningCompetitor?.name ?? "Competitor"} market cap exceeds BTC`
+          : "BTC market cap remains leading";
 
       events.push({
         time: new Date(latestSnapshot.timestamp * 1000).toLocaleDateString(
-          "zh-CN",
+          "en-US",
         ),
-        title: "最新快照",
+        title: "Latest Snapshot",
         description: `${resultText}`,
       });
     }
 
-    // 如果已开奖，添加开奖事件
+    // If resolved, add reveal event
     if (votingPeriod?.resolved) {
       events.push({
-        time: new Date(votingPeriod.endTime * 1000).toLocaleDateString("zh-CN"),
-        title: "触发开奖",
+        time: new Date(votingPeriod.endTime * 1000).toLocaleDateString("en-US"),
+        title: "Reveal Triggered",
         description:
           votingPeriod.correctAnswerYear === 0
-            ? "BTC 市值未被超越"
-            : `${votingPeriod.correctAnswerYear}年市值超越`,
+            ? "BTC market cap not surpassed"
+            : `Market cap surpassed in ${votingPeriod.correctAnswerYear}`,
       });
 
       events.push({
-        time: new Date(votingPeriod.endTime * 1000).toLocaleDateString("zh-CN"),
-        title: "奖励分发",
-        description: "预测正确用户可领取奖励",
+        time: new Date(votingPeriod.endTime * 1000).toLocaleDateString("en-US"),
+        title: "Reward Distribution",
+        description: "Users with correct predictions can claim rewards",
       });
     }
 
@@ -265,9 +270,9 @@ export default function RevealPage() {
       ? events
       : [
           {
-            time: "待更新",
-            title: "等待快照数据",
-            description: "Chainlink 预言机正在监控中",
+            time: "Pending",
+            title: "Waiting for snapshot data",
+            description: "Chainlink oracle is monitoring",
           },
         ];
   }, [latestSnapshot, votingPeriod, competitors]);
@@ -277,55 +282,58 @@ export default function RevealPage() {
       <main className="container mx-auto max-w-6xl px-4 pt-16 pb-20">
         <div className="mb-12 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold md:text-4xl">开奖与奖励</h1>
+            <h1 className="text-3xl font-semibold md:text-4xl">
+              Reveal & Rewards
+            </h1>
             <p className="mt-3 max-w-2xl text-sm text-white/70 md:text-base">
-              Chainlink 每 24
-              小时检测一次竞链市值，当条件达成时立即触发开奖并分发 NFT
-              奖励。以下信息帮助您了解开奖进度与奖励领取方式。
+              Chainlink checks competitor market cap every 24 hours, immediately
+              triggers reveal and distributes NFT rewards when conditions are
+              met. The following information helps you understand the reveal
+              progress and reward claim process.
             </p>
           </div>
           <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs text-white/70">
             <span className="flex h-2 w-2 rounded-full bg-green-400" />
-            Chainlink 状态：{oracleStatus.state}
+            Chainlink Status: {oracleStatus.state}
           </div>
         </div>
 
         <section className="grid gap-6 lg:grid-cols-[1.6fr,1fr]">
           <div className="space-y-6">
             <div className="rounded-3xl border border-white/10 bg-white/10 p-8 backdrop-blur-xl">
-              <h2 className="text-xl font-semibold">开奖监控面板</h2>
+              <h2 className="text-xl font-semibold">Reveal Monitoring Panel</h2>
               <div className="mt-6 grid gap-4 text-sm text-white/70 md:grid-cols-2">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs text-white/50">最近一次检查</p>
+                  <p className="text-xs text-white/50">Last Check</p>
                   <p className="mt-2 text-white">{oracleStatus.lastCheck}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs text-white/50">下一次检查</p>
+                  <p className="text-xs text-white/50">Next Check</p>
                   <p className="mt-2 text-white">{oracleStatus.nextCheck}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs text-white/50">触发条件</p>
+                  <p className="text-xs text-white/50">Trigger Condition</p>
                   <p className="mt-2 text-white">
                     {oracleStatus.triggerCondition}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                  <p className="text-xs text-white/50">快照次数</p>
+                  <p className="text-xs text-white/50">Snapshot Count</p>
                   <p className="mt-2 text-white">
-                    {oracleStatus.snapshotCount} 次
+                    {oracleStatus.snapshotCount} times
                   </p>
                 </div>
               </div>
 
-              {/* 显示最新快照数据 */}
+              {/* Display latest snapshot data */}
               {latestSnapshot && (
                 <div className="mt-6 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
                   <p className="text-sm font-medium text-blue-400">
-                    📊 最新市值快照
+                    📊 Latest Market Cap Snapshot
                   </p>
                   <div className="mt-3 grid gap-3 text-xs md:grid-cols-2">
                     <div>
-                      <span className="text-white/50">BTC 市值：</span>
+                      <span className="text-white/50">BTC Market Cap: </span>
                       <span className="ml-2 text-white">
                         $
                         {(
@@ -335,7 +343,9 @@ export default function RevealPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-white/50">竞争链最高市值：</span>
+                      <span className="text-white/50">
+                        Highest Competitor Market Cap:{" "}
+                      </span>
                       <span className="ml-2 text-white">
                         $
                         {(
@@ -345,14 +355,16 @@ export default function RevealPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-white/50">领先竞争链：</span>
+                      <span className="text-white/50">
+                        Leading Competitor:{" "}
+                      </span>
                       <span className="ml-2 text-white">
                         {competitors[latestSnapshot.winningCompetitorId]
-                          ?.name ?? "未知"}
+                          ?.name ?? "Unknown"}
                       </span>
                     </div>
                     <div>
-                      <span className="text-white/50">结果：</span>
+                      <span className="text-white/50">Result: </span>
                       <span
                         className={`ml-2 font-medium ${
                           latestSnapshot.result === 1
@@ -361,17 +373,17 @@ export default function RevealPage() {
                         }`}
                       >
                         {latestSnapshot.result === 1
-                          ? "竞争链获胜"
+                          ? "Competitor Wins"
                           : latestSnapshot.result === 0
-                            ? "BTC 主导"
-                            : "待定"}
+                            ? "BTC Dominant"
+                            : "Pending"}
                       </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* 显示投票期状态 */}
+              {/* Display voting period status */}
               {votingPeriod && (
                 <div
                   className={`mt-4 rounded-2xl border p-4 ${
@@ -381,7 +393,7 @@ export default function RevealPage() {
                   }`}
                 >
                   <p className="text-sm font-medium text-white">
-                    🗳️ 投票期状态：
+                    🗳️ Voting Period Status:{" "}
                     <span
                       className={`ml-2 ${
                         votingPeriod.resolved
@@ -389,29 +401,30 @@ export default function RevealPage() {
                           : "text-orange-400"
                       }`}
                     >
-                      {votingPeriod.resolved ? "已开奖" : "进行中"}
+                      {votingPeriod.resolved ? "Resolved" : "In Progress"}
                     </span>
                   </p>
                   {votingPeriod.resolved && (
                     <p className="mt-2 text-xs text-white/70">
-                      正确答案：
+                      Correct Answer:{" "}
                       <span className="ml-2 font-medium text-white">
                         {votingPeriod.correctAnswerYear === 0
-                          ? "永不会"
-                          : `${votingPeriod.correctAnswerYear}年`}
+                          ? "Never"
+                          : `${votingPeriod.correctAnswerYear}`}
                       </span>
                     </p>
                   )}
                 </div>
               )}
               <p className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-white/60">
-                提示：Chainlink
-                结果将与平台服务端进行双重签名验证，确保开奖数据一致性。若您预测正确，请保持钱包在线以便领取
-                NFT。
+                Note: Chainlink results will be double-signature verified with
+                the platform server to ensure reveal data consistency. If your
+                prediction is correct, please keep your wallet online to claim
+                NFT.
               </p>
             </div>
 
-            {/* BTC 价格查询模块 */}
+            {/* BTC price query module */}
             <div className="rounded-3xl border border-white/10 bg-white/10 p-8 backdrop-blur-xl">
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/20">
@@ -430,9 +443,12 @@ export default function RevealPage() {
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold">市场快照拍摄</h2>
+                  <h2 className="text-xl font-semibold">
+                    Market Snapshot Capture
+                  </h2>
                   <p className="text-sm text-white/70">
-                    拍摄市场快照，查询并存储 BTC 和竞争链价格数据
+                    Capture market snapshot, query and store BTC and competitor
+                    price data
                   </p>
                 </div>
               </div>
@@ -447,12 +463,12 @@ export default function RevealPage() {
                     {isQueryingPrice ? (
                       <div className="flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-                        提交交易中...
+                        Submitting transaction...
                       </div>
                     ) : isWaitingConfirmation ? (
                       <div className="flex items-center gap-2">
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white"></div>
-                        等待确认中...
+                        Waiting for confirmation...
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
@@ -475,14 +491,14 @@ export default function RevealPage() {
                             d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
                           />
                         </svg>
-                        拍摄市场快照
+                        Take Market Snapshot
                       </div>
                     )}
                   </Button>
 
                   {!walletConnected && (
                     <p className="text-xs text-orange-400">
-                      💡 点击拍摄将自动连接钱包
+                      💡 Clicking will automatically connect wallet
                     </p>
                   )}
                 </div>
@@ -493,7 +509,7 @@ export default function RevealPage() {
                       <div className="mb-3 flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-red-400"></div>
                         <span className="text-sm font-medium text-red-400">
-                          查询失败
+                          Query Failed
                         </span>
                       </div>
                       <p className="text-sm text-red-300">{queryError}</p>
@@ -501,7 +517,7 @@ export default function RevealPage() {
                         onClick={handleQueryBTCPrice}
                         className="mt-2 text-xs text-red-300 underline hover:text-red-200"
                       >
-                        重新查询
+                        Retry Query
                       </button>
                     </div>
                   ) : isWaitingConfirmation ? (
@@ -509,29 +525,32 @@ export default function RevealPage() {
                       <div className="mb-3 flex items-center gap-2">
                         <div className="h-2 w-2 animate-pulse rounded-full bg-yellow-400"></div>
                         <span className="text-sm font-medium text-yellow-400">
-                          交易处理中
+                          Transaction Processing
                         </span>
                         <span className="text-xs text-yellow-300/70">
-                          {new Date().toLocaleTimeString("zh-CN")}
+                          {new Date().toLocaleTimeString("en-US")}
                         </span>
                       </div>
                       <div className="space-y-2">
                         <div>
-                          <span className="text-xs text-white/50">状态：</span>
+                          <span className="text-xs text-white/50">
+                            Status:{" "}
+                          </span>
                           <span className="ml-2 text-lg font-bold text-white">
-                            等待确认
+                            Waiting for Confirmation
                           </span>
                         </div>
                         <div>
-                          <span className="text-xs text-white/50">数据：</span>
+                          <span className="text-xs text-white/50">Data: </span>
                           <span className="ml-2 text-white">
-                            交易已提交，等待区块链确认
+                            Transaction submitted, waiting for blockchain
+                            confirmation
                           </span>
                         </div>
                         {pendingTxHash && (
                           <div>
                             <span className="text-xs text-white/50">
-                              交易哈希：
+                              Transaction Hash:{" "}
                             </span>
                             <span className="ml-2 font-mono text-xs text-white/70">
                               {pendingTxHash.slice(0, 10)}...
@@ -546,23 +565,25 @@ export default function RevealPage() {
                       <div className="mb-3 flex items-center gap-2">
                         <div className="h-2 w-2 rounded-full bg-green-400"></div>
                         <span className="text-sm font-medium text-green-400">
-                          快照创建成功
+                          Snapshot Created Successfully
                         </span>
                         <span className="text-xs text-green-300/70">
                           {new Date(
                             lastPriceQuery.timestamp,
-                          ).toLocaleTimeString("zh-CN")}
+                          ).toLocaleTimeString("en-US")}
                         </span>
                       </div>
                       <div className="space-y-2">
                         <div>
-                          <span className="text-xs text-white/50">状态：</span>
+                          <span className="text-xs text-white/50">
+                            Status:{" "}
+                          </span>
                           <span className="ml-2 text-lg font-bold text-white">
                             {lastPriceQuery.price}
                           </span>
                         </div>
                         <div>
-                          <span className="text-xs text-white/50">数据：</span>
+                          <span className="text-xs text-white/50">Data: </span>
                           <span className="ml-2 text-white">
                             {lastPriceQuery.marketCap}
                           </span>
@@ -572,7 +593,8 @@ export default function RevealPage() {
                   ) : (
                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
                       <p className="text-sm text-white/60">
-                        点击&ldquo;拍摄市场快照&rdquo;查询并存储价格数据
+                        Click &quot;Take Market Snapshot&quot; to query and
+                        store price data
                       </p>
                     </div>
                   )}
@@ -595,13 +617,19 @@ export default function RevealPage() {
                     />
                   </svg>
                   <div className="text-xs text-blue-300">
-                    <p className="mb-1 font-medium">📊 快照说明：</p>
+                    <p className="mb-1 font-medium">
+                      📊 Snapshot Instructions:
+                    </p>
                     <ul className="space-y-1 text-blue-300/80">
-                      <li>• 拍摄当前 BTC 和竞争链的市场快照</li>
-                      <li>• 价格数据来源于 Chainlink 预言机网络</li>
-                      <li>• 快照数据永久存储在区块链上</li>
-                      <li>• 可以随时拍摄快照（无时间限制）</li>
-                      <li>• 需要 Gas 费用和钱包签名</li>
+                      <li>
+                        • Capture current market snapshot of BTC and competitors
+                      </li>
+                      <li>• Price data comes from Chainlink oracle network</li>
+                      <li>
+                        • Snapshot data is permanently stored on blockchain
+                      </li>
+                      <li>• Can take snapshot at any time (no time limit)</li>
+                      <li>• Requires gas fees and wallet signature</li>
                     </ul>
                   </div>
                 </div>
@@ -610,9 +638,9 @@ export default function RevealPage() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-lg font-semibold">开奖时间线</h2>
+                <h2 className="text-lg font-semibold">Reveal Timeline</h2>
                 <span className="text-xs text-white/60">
-                  链上真实数据 · 可追踪 Tx
+                  On-chain real data · Trackable Tx
                 </span>
               </div>
               <div className="mt-4 space-y-4 text-sm text-white/70">
@@ -641,7 +669,7 @@ export default function RevealPage() {
                 ) : (
                   <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center">
                     <p className="text-sm text-white/60">
-                      暂无时间线数据，等待 Chainlink 监控中...
+                      No timeline data yet, waiting for Chainlink monitoring...
                     </p>
                   </div>
                 )}
@@ -650,19 +678,28 @@ export default function RevealPage() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-lg font-semibold">奖励领取指南</h2>
+                <h2 className="text-lg font-semibold">Reward Claim Guide</h2>
                 <Button
                   asChild
                   variant="outline"
                   className="border-white/20 bg-white/5 text-white hover:bg-white/10"
                 >
-                  <Link href="/docs/reward">查看详细教程</Link>
+                  <Link href="/docs/reward">View Detailed Tutorial</Link>
                 </Button>
               </div>
               <ol className="mt-4 space-y-3 text-sm text-white/70">
-                <li>1. Chainlink 触发开奖后，平台会在 5 分钟内发送通知。</li>
-                <li>2. 连接钱包并确认奖励领取交易（仅需签名，免 gas）。</li>
-                <li>3. 在“我的 NFT”中查看，本期奖励支持跨链展示。</li>
+                <li>
+                  1. After Chainlink triggers reveal, the platform will send
+                  notification within 5 minutes.
+                </li>
+                <li>
+                  2. Connect wallet and confirm reward claim transaction
+                  (signature only, gas-free).
+                </li>
+                <li>
+                  3. View in &quot;My NFT&quot;, current period rewards support
+                  cross-chain display.
+                </li>
               </ol>
             </div>
           </div>
@@ -670,19 +707,19 @@ export default function RevealPage() {
           <aside className="space-y-6">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
               <p className="text-xs tracking-wide text-white/60 uppercase">
-                我的获奖记录
+                My Winning Records
               </p>
 
               {!walletConnected ? (
                 <div className="mt-4 text-center">
                   <p className="mb-4 text-sm text-white/60">
-                    连接钱包查看您的获奖记录
+                    Connect wallet to view your winning records
                   </p>
                   <Button
                     onClick={connectWallet}
                     className="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white hover:from-orange-600 hover:to-pink-600"
                   >
-                    连接钱包
+                    Connect Wallet
                   </Button>
                 </div>
               ) : winners.length > 0 ? (
@@ -698,31 +735,34 @@ export default function RevealPage() {
                           <span>{winner.option}</span>
                         </div>
                         <p className="mt-2 text-base text-white">
-                          奖励：{winner.reward}
+                          Reward: {winner.reward}
                         </p>
                       </div>
                     ))}
                   </div>
                   <div className="mt-4 rounded-2xl border border-green-500/20 bg-green-500/10 p-4">
                     <p className="text-xs text-green-400">
-                      🎉 恭喜！您有 {winners.length} 个预测正确的投票
+                      🎉 Congratulations! You have {winners.length} correctly
+                      predicted votes
                     </p>
                   </div>
                 </>
               ) : votingPeriod?.resolved ? (
                 <div className="mt-4 rounded-2xl border border-orange-500/20 bg-orange-500/10 p-4">
                   <p className="text-sm text-orange-400">
-                    😔 您在本期投票中未获奖
+                    😔 You did not win in this voting period
                   </p>
                   <p className="mt-2 text-xs text-white/60">
-                    继续参与下一期投票吧！
+                    Continue participating in the next voting period!
                   </p>
                 </div>
               ) : (
                 <div className="mt-4 rounded-2xl border border-blue-500/20 bg-blue-500/10 p-4">
-                  <p className="text-sm text-blue-400">⏳ 投票期进行中</p>
+                  <p className="text-sm text-blue-400">
+                    ⏳ Voting period in progress
+                  </p>
                   <p className="mt-2 text-xs text-white/60">
-                    等待开奖后查看获奖情况
+                    Wait for reveal to view winning status
                   </p>
                 </div>
               )}
@@ -730,12 +770,18 @@ export default function RevealPage() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
               <p className="text-xs tracking-wide text-white/60 uppercase">
-                常见问题
+                FAQ
               </p>
               <ul className="mt-4 space-y-3 text-sm text-white/70">
-                <li>· 若预测正确但未收到奖励，请在 24 小时内提交工单。</li>
-                <li>· NFT 将默认存放在 Moonbeam，可在稍后跨链至其他网络。</li>
-                <li>· 奖励领取截止日期为开奖后 30 天。</li>
+                <li>
+                  · If your prediction is correct but you haven&apos;t received
+                  a reward, please submit a ticket within 24 hours.
+                </li>
+                <li>
+                  · NFTs will be stored on Moonbeam by default, can be
+                  cross-chained to other networks later.
+                </li>
+                <li>· Reward claim deadline is 30 days after reveal.</li>
               </ul>
             </div>
           </aside>

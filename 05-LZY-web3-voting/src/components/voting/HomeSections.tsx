@@ -41,11 +41,12 @@ export function ConnectWalletPanel({
           id="connect-wallet"
           className="mb-3 text-2xl font-semibold text-white"
         >
-          连接您的 Moonbeam 钱包
+          Connect Your Moonbeam Wallet
         </h2>
         <p className="mx-auto mb-8 max-w-xl text-sm text-gray-300">
-          接入 Moonbeam 网络即可查看 DOT 资产、启动 SLPx
-          跨链铸造流程，并在几分钟内完成 vDOT 抵押与投票。
+          Connect to Moonbeam network to view DOT assets, initiate SLPx
+          cross-chain minting process, and complete vDOT staking and voting in
+          minutes.
         </p>
         <Button
           onClick={onConnect}
@@ -53,15 +54,15 @@ export function ConnectWalletPanel({
           size="lg"
           className="border-0 bg-gradient-to-r from-cyan-500 to-purple-500 px-10 text-white hover:from-cyan-600 hover:to-purple-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isConnecting ? "连接中..." : "连接钱包"}
+          {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
         <p className="mt-6 text-xs text-gray-400">
-          尚未安装 Moonbeam 扩展？
+          Haven&apos;t installed Moonbeam extension?
           <Link
             href="https://docs.moonbeam.network/learn/features/connect/"
             className="ml-1 text-cyan-300 underline-offset-4 hover:underline"
           >
-            查看连接指南
+            View Connection Guide
           </Link>
         </p>
       </div>
@@ -72,38 +73,42 @@ export function ConnectWalletPanel({
 export function ProcessTimeline() {
   const steps = [
     {
-      title: "连接钱包",
-      subtitle: "同步 Moonbeam DOT 余额",
-      description: "签名授权后即可检测可用 DOT 并校验网络状态。",
+      title: "Connect Wallet",
+      subtitle: "Sync Moonbeam DOT Balance",
+      description:
+        "After signing authorization, you can detect available DOT and verify network status.",
       iconBg: "from-cyan-500 to-cyan-400",
       href: "#connect",
     },
     {
-      title: "铸造 vDOT",
-      subtitle: "一键调用 Bifrost SLPx",
-      description: "跨链桥自动完成 DOT→vDOT 兑换与回传。",
+      title: "Mint vDOT",
+      subtitle: "One-click Bifrost SLPx",
+      description:
+        "Cross-chain bridge automatically completes DOT→vDOT exchange and return.",
       iconBg: "from-purple-500 to-purple-400",
       href: "/mint",
     },
     {
-      title: "抵押换票券",
-      subtitle: "锁定 vDOT 获得投票权",
-      description: "自研合约托管资产，项目方仅可代理治理。",
+      title: "Stake for Tickets",
+      subtitle: "Lock vDOT to Get Voting Rights",
+      description:
+        "Self-developed contract escrows assets, project team can only proxy governance.",
       iconBg: "from-indigo-500 to-indigo-400",
       href: "/stake",
     },
     {
-      title: "提交预测",
-      subtitle: "选择 BTC 超越年份",
-      description: "Chainlink 监控竞链市值，触发开奖分发 NFT。",
+      title: "Submit Prediction",
+      subtitle: "Select BTC Surpass Year",
+      description:
+        "Chainlink monitors competitor market cap, triggers reveal and distributes NFT.",
       iconBg: "from-pink-500 to-pink-400",
       href: "/vote",
     },
     {
-      title: "加入社区",
-      subtitle: "进群获取最新活动",
+      title: "Join Community",
+      subtitle: "Join Group for Latest Activities",
       description:
-        "加入 Telegram 社区，与核心团队和预测者实时交流、抢先获取开奖通知。",
+        "Join Telegram community to interact with core team and predictors in real-time and get reveal notifications first.",
       iconBg: "from-emerald-500 to-teal-400",
       href: "https://t.me/vdot_community",
       external: true,
@@ -115,17 +120,19 @@ export function ProcessTimeline() {
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 id="process-title" className="text-2xl font-semibold text-white">
-            五分钟完成全流程
+            Complete Process in Five Minutes
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-gray-300">
-            从钱包连接到预测提交仅需四步，系统会在关键节点提供引导与状态反馈，确保跨链、抵押与投票均顺利完成。
+            From wallet connection to prediction submission in just four steps,
+            the system provides guidance and status feedback at key points to
+            ensure cross-chain, staking and voting are completed successfully.
           </p>
         </div>
         <Link
           href="#missions"
           className="text-sm text-cyan-300 underline-offset-4 hover:underline"
         >
-          查看交互示意
+          View Interaction Demo
         </Link>
       </div>
       <ol className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -153,7 +160,7 @@ export function ProcessTimeline() {
                   ? { target: "_blank", rel: "noopener noreferrer" }
                   : {})}
               >
-                了解更多
+                Learn More
               </Link>
             </div>
             <h3 className="text-lg font-semibold text-white">{step.title}</h3>
@@ -177,7 +184,7 @@ export function AssetOverview() {
   const userData = useUserData();
   const walletConnected = Boolean(address);
 
-  // 计算可铸造额度
+  // Calculate available minting amount
   const availableToMint = useMemo(() => {
     if (!walletConnected || userData.isLoading) return "--";
 
@@ -189,75 +196,75 @@ export function AssetOverview() {
   }, [walletConnected, userData]);
   const cards = [
     {
-      label: "Moonbeam DOT 余额",
+      label: "Moonbeam DOT Balance",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
-            : `${userData.nativeBalance} ETH`
+            ? "Data Error"
+            : `${userData.nativeBalance} DOT`
         : "--",
-      hint: "连接钱包后显示实际余额",
+      hint: "Actual balance displayed after wallet connection",
       accent: "from-cyan-500/30 to-cyan-400/20",
     },
     {
-      label: "可铸造额度",
+      label: "Available to Mint",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
-            : `${availableToMint} ETH`
+            ? "Data Error"
+            : `${availableToMint} DOT`
         : "--",
-      hint: "扣除保留抵押后剩余可用",
+      hint: "Remaining available after deducting reserved staking",
       accent: "from-purple-500/30 to-purple-400/20",
     },
     {
-      label: "已铸造 vDOT",
+      label: "Minted vDOT",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
+            ? "Data Error"
             : `${userData.vDOTBalance} vDOT`
         : "--",
-      hint: "跨链成功后自动更新",
+      hint: "Auto-updated after successful cross-chain",
       accent: "from-blue-500/30 to-indigo-400/20",
     },
     {
-      label: "票券余额",
+      label: "Ticket Balance",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
-            : `${userData.ticketBalance} 张`
+            ? "Data Error"
+            : `${userData.ticketBalance} tickets`
         : "--",
-      hint: "1 vDOT = 1 投票券",
+      hint: "1 vDOT = 1 voting ticket",
       accent: "from-pink-500/30 to-pink-400/20",
     },
     {
-      label: "已抵押总量",
+      label: "Total Staked",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
+            ? "Data Error"
             : `${userData.stakedAmount} vDOT`
         : "--",
-      hint: "抵押合约实时同步",
+      hint: "Staking contract real-time sync",
       accent: "from-emerald-500/30 to-emerald-400/20",
     },
     {
-      label: "可用投票权",
+      label: "Available Voting Power",
       value: walletConnected
         ? userData.isLoading
-          ? "加载中..."
+          ? "Loading..."
           : userData.hasError
-            ? "数据错误"
-            : `${userData.votingPower} 票`
+            ? "Data Error"
+            : `${userData.votingPower} votes`
         : "--",
-      hint: "抵押后立即获得",
+      hint: "Received immediately after staking",
       accent: "from-orange-500/30 to-amber-400/20",
     },
   ];
@@ -267,17 +274,19 @@ export function AssetOverview() {
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h2 id="assets-title" className="text-2xl font-semibold text-white">
-            资产概览
+            Asset Overview
           </h2>
           <p className="mt-2 text-sm text-gray-300">
-            资产数据实时读取链上信息，帮助您了解可铸造额度、抵押情况与剩余投票权。
+            Asset data is read from on-chain information in real-time, helping
+            you understand mintable amounts, staking status and remaining voting
+            power.
           </p>
         </div>
         <Link
           href="/mint"
           className="text-sm text-cyan-300 underline-offset-4 hover:underline"
         >
-          立即铸造 vDOT
+          Mint vDOT Now
         </Link>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -318,15 +327,15 @@ export function MissionChecklist({ tasks }: MissionChecklistProps) {
                 id="mission-title"
                 className="text-2xl font-semibold text-white"
               >
-                新手任务清单
+                Beginner Task Checklist
               </h2>
               <p className="text-sm text-gray-300">
-                依次完成四个步骤即可领取首个投票 NFT。
+                Complete four steps in order to claim your first voting NFT.
               </p>
             </div>
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-gray-200">
               <span className="flex h-2 w-2 rounded-full bg-green-400" />
-              {completed}/{tasks.length} 已完成
+              {completed}/{tasks.length} Completed
             </div>
           </div>
 
@@ -389,13 +398,14 @@ export function MissionChecklist({ tasks }: MissionChecklistProps) {
         <div className="flex h-full flex-col justify-between gap-6 rounded-3xl border border-white/10 bg-gradient-to-br from-cyan-500/10 to-purple-500/10 p-6 backdrop-blur-xl">
           <div>
             <p className="text-sm tracking-wide text-gray-200 uppercase">
-              总体进度
+              Overall Progress
             </p>
             <p className="mt-3 text-4xl font-semibold text-white">
               {progress}%
             </p>
             <p className="mt-2 text-sm text-gray-200">
-              完成全部任务后即可在开奖阶段领取限量预测者 NFT。
+              After completing all tasks, you can claim limited predictor NFT
+              during the reveal phase.
             </p>
           </div>
           <Button
@@ -403,7 +413,7 @@ export function MissionChecklist({ tasks }: MissionChecklistProps) {
             variant="secondary"
             className="border-white/30 bg-white/10 text-white hover:bg-white/20"
           >
-            <Link href="/docs/tutorial">查看任务指引</Link>
+            <Link href="/docs/tutorial">View Task Guide</Link>
           </Button>
         </div>
       </div>
@@ -414,24 +424,24 @@ export function MissionChecklist({ tasks }: MissionChecklistProps) {
 export function FaqSection() {
   const faqs = [
     {
-      question: "为什么需要先在 Moonbeam 铸造 vDOT？",
+      question: "Why do I need to mint vDOT on Moonbeam first?",
       answer:
-        "vDOT 是 Bifrost 上的质押衍生资产，通过 SLPx 跨链即可让 DOT 自动转换为可抵押、可投票的资产。",
+        "vDOT is a staking derivative asset on Bifrost. Through SLPx cross-chain, DOT can be automatically converted into a stakable and votable asset.",
     },
     {
-      question: "抵押合约是否安全？",
+      question: "Is the staking contract safe?",
       answer:
-        "抵押合约经过第三方审计，并公开在链上，项目方仅具备代理投票权限，无法转移用户的 vDOT。",
+        "The staking contract has been audited by third parties and is publicly available on-chain. The project team only has proxy voting rights and cannot transfer users' vDOT.",
     },
     {
-      question: "Chainlink 如何触发开奖？",
+      question: "How does Chainlink trigger the reveal?",
       answer:
-        "预言机每 24 小时检测一次主流竞争链市值，当任一链超越 BTC 时即触发开奖并记录预测正确的地址。",
+        "The oracle checks mainstream competitor market cap every 24 hours. When any chain surpasses BTC, it triggers the reveal and records addresses with correct predictions.",
     },
     {
-      question: "可以撤销投票吗？",
+      question: "Can I revoke my vote?",
       answer:
-        "投票提交后即锁定对应票券，无法修改，但可以在下一期活动中重新参与。",
+        "After submission, votes lock corresponding tickets and cannot be modified, but you can participate again in the next voting period.",
     },
   ];
 
@@ -440,17 +450,19 @@ export function FaqSection() {
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h2 id="faq-title" className="text-2xl font-semibold text-white">
-            常见问题与风险提示
+            FAQ & Risk Notice
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-gray-300">
-            我们整理了参与过程中最常见的疑问，并附上审计与文档链接，帮助您更安全地完成跨链与抵押操作。
+            We&apos;ve compiled the most common questions during participation,
+            along with audit and documentation links, to help you complete
+            cross-chain and staking operations more safely.
           </p>
         </div>
         <Link
           href="/docs/security"
           className="text-sm text-cyan-300 underline-offset-4 hover:underline"
         >
-          查看安全白皮书
+          View Security Whitepaper
         </Link>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
@@ -467,7 +479,7 @@ export function FaqSection() {
               href="/docs/faq"
               className="mt-4 inline-flex items-center text-xs text-cyan-300 underline-offset-4 hover:underline"
             >
-              了解更多
+              Learn More
               <svg
                 className="ml-1 h-3.5 w-3.5"
                 fill="none"
@@ -498,34 +510,34 @@ export function ChainlinkStatusCard() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <p className="text-xs tracking-wide text-white/60 uppercase">
-            Chainlink 预言机
+            Chainlink Oracle
           </p>
           <h2 className="mt-2 text-xl font-semibold text-white">
-            开奖监听状态
+            Reveal Monitoring Status
           </h2>
         </div>
         <span className="flex items-center gap-2 rounded-full border border-green-400/50 bg-green-500/10 px-3 py-1 text-xs text-green-300">
           <span className="flex h-2 w-2 rounded-full bg-green-400" />
-          运行中
+          Running
         </span>
       </div>
       <div className="space-y-4 text-sm text-gray-200">
         <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-          <span>最近一次检测</span>
+          <span>Last Check</span>
           <span className="text-white">2025-03-01 14:30 (UTC+0)</span>
         </div>
         <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-          <span>正在监听</span>
-          <span className="text-white">Top 10 竞争链市值</span>
+          <span>Monitoring</span>
+          <span className="text-white">Top 10 Competitor Market Cap</span>
         </div>
         <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4">
-          <span>触发条件</span>
-          <span className="text-white">任一竞争链市值 ≥ BTC</span>
+          <span>Trigger Condition</span>
+          <span className="text-white">Any competitor market cap ≥ BTC</span>
         </div>
       </div>
       <p className="mt-6 text-xs text-gray-400">
-        Chainlink 数据喂价每 24
-        小时更新一次，触发条件满足后系统将自动结算并分发奖励 NFT。
+        Chainlink data feeds update every 24 hours. After trigger conditions are
+        met, the system will automatically settle and distribute reward NFTs.
       </p>
     </section>
   );
@@ -552,8 +564,9 @@ export function ActionCallouts({
     onClick?: () => void;
   }> = [
     {
-      title: "铸造 vDOT",
-      description: "通过 Bifrost SLPx 一次点击完成 DOT → vDOT 跨链兑换。",
+      title: "Mint vDOT",
+      description:
+        "Complete DOT → vDOT cross-chain exchange with one click through Bifrost SLPx.",
       href: "/mint",
       accent: "from-cyan-500/30 to-cyan-300/20",
       icon: (
@@ -573,8 +586,9 @@ export function ActionCallouts({
       ),
     },
     {
-      title: "抵押 & 获取票券",
-      description: "锁定 vDOT 获得投票权，智能合约托管资产确保安全。",
+      title: "Stake & Get Tickets",
+      description:
+        "Lock vDOT to get voting rights, smart contract escrows assets to ensure security.",
       href: "/stake",
       accent: "from-purple-500/30 to-purple-300/20",
       icon: (
@@ -606,10 +620,10 @@ export function ActionCallouts({
       ),
     },
     {
-      title: hasVoted ? "查看投票结果" : "立即提交预测",
+      title: hasVoted ? "View Vote Results" : "Submit Prediction Now",
       description: hasVoted
-        ? "随时关注社区预测趋势与奖励发放时间。"
-        : "选择 BTC 被超越的年度区间，提交后等待 Chainlink 开奖。",
+        ? "Keep an eye on community prediction trends and reward distribution time."
+        : "Select the year range when BTC will be surpassed, submit and wait for Chainlink reveal.",
       href: "/vote",
       accent: "from-pink-500/30 to-pink-300/20",
       icon: (
@@ -635,10 +649,10 @@ export function ActionCallouts({
       ),
     },
     {
-      title: communityJoined ? "已加入社区" : "加入 TG 社区",
+      title: communityJoined ? "Community Joined" : "Join TG Community",
       description: communityJoined
-        ? "欢迎回来，最新开奖与提案会第一时间同步到群内。"
-        : "加入 Telegram 群，实时获取开奖提醒、提案动态与福利活动。",
+        ? "Welcome back! Latest reveals and proposals will be synced to the group in real-time."
+        : "Join Telegram group to get reveal alerts, proposal updates and benefit activities in real-time.",
       href: "https://t.me/vdot_community",
       accent: "from-emerald-500/30 to-teal-300/20",
       icon: (
@@ -664,7 +678,7 @@ export function ActionCallouts({
   return (
     <section className="mb-16" aria-labelledby="actions-title">
       <h2 id="actions-title" className="mb-6 text-2xl font-semibold text-white">
-        快速入口
+        Quick Access
       </h2>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
@@ -685,7 +699,7 @@ export function ActionCallouts({
               <p className="mt-3 text-sm text-gray-200">{card.description}</p>
             </div>
             <span className="mt-6 inline-flex items-center text-sm text-cyan-200">
-              查看详情
+              View Details
               <svg
                 className="ml-1 h-4 w-4 transition group-hover:translate-x-1"
                 fill="none"

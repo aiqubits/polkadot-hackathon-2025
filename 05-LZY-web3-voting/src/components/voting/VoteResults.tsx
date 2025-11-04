@@ -6,11 +6,11 @@ import { useState, useEffect } from "react";
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
 
 const optionLabels: Record<number, { label: string; color: string }> = {
-  3: { label: "3 年内", color: "bg-red-500" },
-  5: { label: "5 年内", color: "bg-orange-500" },
-  10: { label: "10 年内", color: "bg-yellow-500" },
-  20: { label: "20 年内", color: "bg-green-500" },
-  99: { label: "永不会", color: "bg-blue-500" },
+  3: { label: "Within 3 years", color: "bg-red-500" },
+  5: { label: "Within 5 years", color: "bg-orange-500" },
+  10: { label: "Within 10 years", color: "bg-yellow-500" },
+  20: { label: "Within 20 years", color: "bg-green-500" },
+  99: { label: "Never", color: "bg-blue-500" },
 };
 
 interface VoteResult {
@@ -36,7 +36,7 @@ export function VoteResults() {
         setResults([
           {
             option: 3,
-            label: "3 年内",
+            label: "Within 3 years",
             votes: 15,
             votingPower: 1500,
             percentage: 15,
@@ -44,7 +44,7 @@ export function VoteResults() {
           },
           {
             option: 5,
-            label: "5 年内",
+            label: "Within 5 years",
             votes: 25,
             votingPower: 2500,
             percentage: 25,
@@ -52,7 +52,7 @@ export function VoteResults() {
           },
           {
             option: 10,
-            label: "10 年内",
+            label: "Within 10 years",
             votes: 30,
             votingPower: 3000,
             percentage: 30,
@@ -60,7 +60,7 @@ export function VoteResults() {
           },
           {
             option: 20,
-            label: "20 年内",
+            label: "Within 20 years",
             votes: 20,
             votingPower: 2000,
             percentage: 20,
@@ -68,7 +68,7 @@ export function VoteResults() {
           },
           {
             option: 99,
-            label: "永不会",
+            label: "Never",
             votes: 10,
             votingPower: 1000,
             percentage: 10,
@@ -99,7 +99,7 @@ export function VoteResults() {
         // Format results data
         const formattedResults: VoteResult[] = data.results.map((r) => ({
           option: r.option,
-          label: optionLabels[r.option]?.label ?? "未知",
+          label: optionLabels[r.option]?.label ?? "Unknown",
           votes: r.votes,
           votingPower: r.votingPower,
           percentage: parseFloat(r.percentage),
@@ -157,7 +157,7 @@ export function VoteResults() {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <p className="mt-4 text-gray-400">加载中...</p>
+          <p className="mt-4 text-gray-400">Loading...</p>
         </div>
       </div>
     );
@@ -166,7 +166,7 @@ export function VoteResults() {
   return (
     <div className="sticky top-24 rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-white">实时投票结果</h2>
+        <h2 className="text-white">Real-time Vote Results</h2>
         <div className="h-2 w-2 animate-pulse rounded-full bg-green-400" />
       </div>
 
@@ -175,7 +175,7 @@ export function VoteResults() {
           <div className="mb-1 text-3xl text-white">
             {totalParticipants.toLocaleString()}
           </div>
-          <div className="text-sm text-gray-400">总投票数</div>
+          <div className="text-sm text-gray-400">Total Votes</div>
         </div>
       </div>
 
@@ -193,7 +193,7 @@ export function VoteResults() {
               />
             </div>
             <div className="text-right text-xs text-gray-400">
-              {result.votingPower.toLocaleString()} 投票权
+              {result.votingPower.toLocaleString()} voting rights
             </div>
           </div>
         ))}
@@ -216,11 +216,11 @@ export function VoteResults() {
               />
             </svg>
             <div>
-              <p className="mb-1 text-sm text-white">社区趋势</p>
+              <p className="mb-1 text-sm text-white">Community Trend</p>
               <p className="text-xs text-gray-400">
                 {topChoice.label
-                  ? `大多数用户认为 BTC 将${topChoice.label}被超越`
-                  : "暂无投票数据"}
+                  ? `Most users believe BTC will be surpassed ${topChoice.label}`
+                  : "No vote data yet"}
               </p>
             </div>
           </div>
@@ -229,16 +229,16 @@ export function VoteResults() {
 
       <div className="mt-6 space-y-2 text-xs text-gray-400">
         <div className="flex items-center justify-between">
-          <span>参与地址数:</span>
+          <span>Participating Addresses:</span>
           <span className="text-white">{totalParticipants}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>总锁仓 vDOT:</span>
+          <span>Total Locked vDOT:</span>
           <span className="text-white">{totalStaked.toFixed(2)}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span>更新时间:</span>
-          <span className="text-white">实时</span>
+          <span>Last Update:</span>
+          <span className="text-white">Real-time</span>
         </div>
       </div>
     </div>

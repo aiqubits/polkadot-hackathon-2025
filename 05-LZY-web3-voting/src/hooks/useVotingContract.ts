@@ -5,13 +5,13 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { formatEther, createPublicClient, http } from "viem";
-import { getContractAddress } from "@/config/contracts";
+import {
+  getContractAddress,
+  votingContractAbi,
+  votingTicketAbi,
+} from "@/config/contracts";
 import { useChainId } from "wagmi";
 import { getChainById } from "@/config/chains";
-
-// Import ABIs
-import votingContractAbi from "@/contracts/abis/VotingContract.json";
-import votingTicketAbi from "@/contracts/abis/VotingTicket.json";
 
 // Types for contract responses
 interface UserVote {
