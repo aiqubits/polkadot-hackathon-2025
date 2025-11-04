@@ -1,0 +1,14 @@
+# 前端 & 后端 node_modules 都不要传
+node_modules/
+backend/node_modules/
+
+# 所有环境变量文件都不要上传
+backend/.env
+
+# 其他常见忽略
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
